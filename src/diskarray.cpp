@@ -22,14 +22,15 @@ void diskArray::load(int rows)
 		cerr<<"error in load"<<endl;
 }
 
-void diskArray::init(int rownumber)
+void diskArray::init(string name)
 {
+	filename = name;
 	fp = fopen(filename.c_str(),"rwb");
-	rows = rownumber;
 }
 
-void diskArray::set_length(int len)
+void diskArray::set_length(int rownumber, int len)
 {
+	rows = rownumber;
 	length = len;
 	fseek(fp,(rows+1)*length*sizeof(int),SEEK_SET);
 	fputc('\n',fp);

@@ -844,12 +844,14 @@ int model::init_est_disk() {
     }
 		
     // + allocate memory and assign values for variables
-    M = ptrndata->M;
-    V = ptrndata->V;
+    M = ptrndata->M;//Number of documents
+    V = ptrndata->V;//Number of words
     // K: from command line or default value
     // alpha, beta: from command line or default values
     // niters, savestep: from command line or default values
 
+
+    // K is the topic number.
     nw = new int*[V];
     for (w = 0; w < V; w++) {
         nw[w] = new int[K];
@@ -866,8 +868,9 @@ int model::init_est_disk() {
         }
     }
 */
-    ND.init(M);
-    ND.set_length(K);
+    string name = "nd.tmp";
+    ND.init(name);
+    ND.set_length(M,K);
     for(m=0; m<M; m++){
 	for( k=0; k<K; k++)
 	   ND.visit(m,k)=0;
@@ -946,9 +949,10 @@ int model::init_estc_disk() {
     	    nd[m][k] = 0;
         }
     }
-*/	
-    ND.init(M);
-    ND.set_length(K);
+*/
+    string name = "nd.tmp";	
+    ND.init(name);
+    ND.set_length(M,K);
     for(m=0;m<M;m++){
 	for(k=0;k<K;k++)
 	  ND.visit(m,k)=0;

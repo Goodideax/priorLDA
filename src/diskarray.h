@@ -26,14 +26,13 @@ class diskArray
 	void load(int rows);
 public:
 	//set the row and column number
-        void init(int rownumber);
-	void set_length(int len);
+        void init(string name);
+	void set_length(int rownumber, int len);
 
 	//visit an element
 	int &visit(int i,int j);
 	diskArray()
 	{
-		filename="array.tmp";
 		cur_row = -1;
 	}	
 };

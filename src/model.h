@@ -84,6 +84,9 @@ public:
     double ** phi; // phi: topic-word distributions, size K x V
 
     diskArray ND;//A disk-based nd array;
+    diskArray NW;//A disk-based nw array;
+    diskArray NEWND;//A disk-based newnd array;
+    diskArray NEWNW;//A disk-based newnw array;
     
     // for inference only
     int inf_liter;
