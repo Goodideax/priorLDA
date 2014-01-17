@@ -226,8 +226,19 @@ int model::init(int argc, char ** argv) {
 	if (init_inf()) {
 	    return 1;
 	}
+    } else if (model_status == MODEL_STATUS_EST_DISK) {
+	if(init_est_disk()) {
+		return 1;
+	}
+    } else if (model_status ==MODEL_STATUS_ESTC_DISK) {
+	if(init_estc_disk()){
+		return 1;
+	}
+    } else if (model_status ==MODEL_STATUS_INF) {
+	if(init_inf_disk()) {
+		return 1;
+	}
     }
-    
     return 0;
 }
 
@@ -834,6 +845,9 @@ void model::compute_phi() {
 int model::init_est_disk() {
     int m, n, w, k;
 
+    if(TEST)
+	printf("Entering: init_est_disk()\n");
+
     p = new double[K];
 
     // + read training data
@@ -1001,6 +1015,8 @@ int model::init_estc_disk() {
 }
 
 void model::estimate_disk() {
+    if(TEST)
+	printf("Entering: estimate_disk");
     if (twords > 0) {
 	// print out top words per topic
 	dataset::read_wordmap(dir + wordmapfile, &id2word);
@@ -1093,6 +1109,145 @@ void model::compute_phi_disk() {
 	    phi[k][w] = (nw[w][k] + beta) / (nwsum[k] + V * beta);
 	}
     }
+}
+
+
+
+int model::init_inf_disk() {
+    // estimating the model from a previously estimated one
+    int m, n, w, k;
+
+    p = new double[K];
+
+    // load moel, i.e., read z and ptrndata
+    if (load_model(model_name)) {
+	printf("Fail to load word-topic assignmetn file of the model!\n");
+	return 1;
+    }
+
+    nw = new int*[V];
+    for (w = 0; w < V; w++) {
+        nw[w] = new int[K];
+        for (k = 0; k < K; k++) {
+    	    nw[w][k] = 0;
+        }
+    }
+	
+    nd = new int*[M];
+    for (m = 0; m < M; m++) {
+        nd[m] = new int[K];
+        for (k = 0; k < K; k++) {
+    	    nd[m][k] = 0;
+        }
+    }
+	
+    nwsum = new int[K];
+    for (k = 0; k < K; k++) {
+	nwsum[k] = 0;
+    }
+    
+    ndsum = new int[M];
+    for (m = 0; m < M; m++) {
+	ndsum[m] = 0;
+    }
+
+    for (m = 0; m < ptrndata->M; m++) {
+	int N = ptrndata->docs[m]->length;
+
+	// assign values for nw, nd, nwsum, and ndsum	
+        for (n = 0; n < N; n++) {
+    	    int w = ptrndata->docs[m]->words[n];
+    	    int topic = z[m][n];
+    	    
+    	    // number of instances of word i assigned to topic j
+    	    nw[w][topic] += 1;
+    	    // number of words in document i assigned to topic j
+    	    nd[m][topic] += 1;
+    	    // total number of words assigned to topic j
+    	    nwsum[topic] += 1;
+        } 
+        // total number of words in document i
+        ndsum[m] = N;      
+    }
+    
+    // read new data for inference
+    pnewdata = new dataset;
+    if (withrawstrs) {
+	if (pnewdata->read_newdata_withrawstrs(dir + dfile, dir + wordmapfile)) {
+    	    printf("Fail to read new data!\n");
+    	    return 1;
+	}    
+    } else {
+	if (pnewdata->read_newdata(dir + dfile, dir + wordmapfile)) {
+    	    printf("Fail to read new data!\n");
+    	    return 1;
+	}    
+    }
+    
+    newM = pnewdata->M;
+    newV = pnewdata->V;
+    
+    newnw = new int*[newV];
+    for (w = 0; w < newV; w++) {
+        newnw[w] = new int[K];
+        for (k = 0; k < K; k++) {
+    	    newnw[w][k] = 0;
+        }
+    }
+	
+    newnd = new int*[newM];
+    for (m = 0; m < newM; m++) {
+        newnd[m] = new int[K];
+        for (k = 0; k < K; k++) {
+    	    newnd[m][k] = 0;
+        }
+    }
+	
+    newnwsum = new int[K];
+    for (k = 0; k < K; k++) {
+	newnwsum[k] = 0;
+    }
+    
+    newndsum = new int[newM];
+    for (m = 0; m < newM; m++) {
+	newndsum[m] = 0;
+    }
+
+    srandom(time(0)); // initialize for random number generation
+    newz = new int*[newM];
+    for (m = 0; m < pnewdata->M; m++) {
+	int N = pnewdata->docs[m]->length;
+	newz[m] = new int[N];
+
+	// assign values for nw, nd, nwsum, and ndsum	
+        for (n = 0; n < N; n++) {
+    	    int w = pnewdata->docs[m]->words[n];
+    	    int _w = pnewdata->_docs[m]->words[n];
+    	    int topic = (int)(((double)random() / RAND_MAX) * K);
+    	    newz[m][n] = topic;
+    	    
+    	    // number of instances of word i assigned to topic j
+    	    newnw[_w][topic] += 1;
+    	    // number of words in document i assigned to topic j
+    	    newnd[m][topic] += 1;
+    	    // total number of words assigned to topic j
+    	    newnwsum[topic] += 1;
+        } 
+        // total number of words in document i
+        newndsum[m] = N;      
+    }    
+    
+    newtheta = new double*[newM];
+    for (m = 0; m < newM; m++) {
+        newtheta[m] = new double[K];
+    }
+	
+    newphi = new double*[K];
+    for (k = 0; k < K; k++) {
+        newphi[k] = new double[newV];
+    }    
+    
+    return 0;        
 }
 
 

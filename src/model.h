@@ -149,6 +149,15 @@ public:
     void compute_theta();
     void compute_phi();
    
+ 
+    // init for inference
+    int init_inf();
+    // inference for new (unseen) data based on the estimated LDA model
+    void inference();
+    int inf_sampling(int m, int n);
+    void compute_newtheta();
+    void compute_newphi();
+
     // init for disk_based estimation
     int init_est_disk();
     int init_estc_disk();
@@ -158,14 +167,9 @@ public:
     int sampling_disk(int m, int n);
     void compute_theta_disk();
     void compute_phi_disk();
- 
-    // init for inference
-    int init_inf();
-    // inference for new (unseen) data based on the estimated LDA model
-    void inference();
-    int inf_sampling(int m, int n);
-    void compute_newtheta();
-    void compute_newphi();
+
+    int init_inf_disk();
+
 };
 
 #endif

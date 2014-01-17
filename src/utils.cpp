@@ -56,7 +56,16 @@ int utils::parse_args(int argc, char ** argv, model * pmodel) {
 	} else if (arg == "-inf") {
 	    model_status = MODEL_STATUS_INF;
 	    
-	} else if (arg == "-dir") {
+	} else if (arg == "-est_d") {
+	    model_status = MODEL_STATUS_EST_DISK;
+	    
+	} else if (arg == "-estc_d") {
+	    model_status = MODEL_STATUS_ESTC_DISK;
+	    
+	} else if (arg == "-inf_d") {
+	    model_status = MODEL_STATUS_INF_DISK;
+	    
+	}else if (arg == "-dir") {
 	    dir = argv[++i];	    
 	    
 	} else if (arg == "-dfile") {
@@ -140,7 +149,53 @@ int utils::parse_args(int argc, char ** argv, model * pmodel) {
 	    printf("dfile = %s\n", pmodel->dfile.c_str());
 	}
     } 
-    
+    if (model_status == MODEL_STATUS_EST_DISK) {
+	if (dfile == "") {
+	    printf("Please specify the input data file for model estimation!\n");
+	    return 1;
+	}
+	
+	pmodel->model_status = model_status;
+	
+	if (K > 0) {
+	    pmodel->K = K;
+	}
+	
+	if (alpha >= 0.0) {
+	    pmodel->alpha = alpha;
+	} else {
+	    // default value for alpha
+	    pmodel->alpha = 50.0 / pmodel->K;
+	}
+	
+	if (beta >= 0.0) {
+	    pmodel->beta = beta;
+	}
+	
+	if (niters > 0) {
+	    pmodel->niters = niters;
+	}
+	
+	if (savestep > 0) {
+	    pmodel->savestep = savestep;
+	}
+	
+	if (twords > 0) {
+	    pmodel->twords = twords;
+	}
+	
+	pmodel->dfile = dfile;
+	
+	string::size_type idx = dfile.find_last_of("/");			
+	if (idx == string::npos) {
+	    pmodel->dir = "./";
+	} else {
+	    pmodel->dir = dfile.substr(0, idx + 1);
+	    pmodel->dfile = dfile.substr(idx + 1, dfile.size() - pmodel->dir.size());
+	    printf("dir = %s\n", pmodel->dir.c_str());
+	    printf("dfile = %s\n", pmodel->dfile.c_str());
+	}
+    }
     if (model_status == MODEL_STATUS_ESTC) {
 	if (dir == "") {
 	    printf("Please specify model directory!\n");

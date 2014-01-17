@@ -39,6 +39,13 @@ int main(int argc, char ** argv) {
 	// parameter estimation
 	lda.estimate();
     }
+   
+    if (lda.model_status == MODEL_STATUS_EST_DISK || lda.model_status == MODEL_STATUS_ESTC_DISK) {
+	// parameter estimation
+	lda.estimate_disk();
+    }
+
+    
     
     if (lda.model_status == MODEL_STATUS_INF) {
 	// do inference

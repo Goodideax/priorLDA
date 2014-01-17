@@ -31,6 +31,10 @@
 #define	MODEL_STATUS_EST	1
 #define	MODEL_STATUS_ESTC	2
 #define	MODEL_STATUS_INF	3
+#define MODEL_STATUS_EST_DISK   4
+#define MODEL_STATUS_ESTC_DISK  5
+#define MODEL_STATUS_INF_DISK   6
+#define TEST 1
 
 #endif
 
