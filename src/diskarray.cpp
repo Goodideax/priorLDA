@@ -25,7 +25,7 @@ void diskArray::load(int rows)
 void diskArray::init(string name)
 {
 	filename = name;
-	fp = fopen(filename.c_str(),"rwb");
+	fp = fopen(filename.c_str(),"w+b");
 }
 
 void diskArray::set_length(int rownumber, int len)

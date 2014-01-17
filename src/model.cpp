@@ -1016,7 +1016,7 @@ int model::init_estc_disk() {
 
 void model::estimate_disk() {
     if(TEST)
-	printf("Entering: estimate_disk");
+	printf("Entering: estimate_disk\n");
     if (twords > 0) {
 	// print out top words per topic
 	dataset::read_wordmap(dir + wordmapfile, &id2word);
@@ -1059,6 +1059,8 @@ void model::estimate_disk() {
 
 int model::sampling_disk(int m, int n) {
     // remove z_i from the count variables
+//    if(TEST)
+//	printf("sampleing_disk: m:%d n:%d\n",m,n);
     int topic = z[m][n];
     int w = ptrndata->docs[m]->words[n];
     nw[w][topic] -= 1;
