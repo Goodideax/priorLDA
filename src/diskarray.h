@@ -1,6 +1,6 @@
 #ifndef _DISKARRAY_H
 #define _DISKARRAY_H
-
+#include <cstdio>
 #include <string>
 using namespace std;
 class diskArray
@@ -34,6 +34,12 @@ public:
 	diskArray()
 	{
 		cur_row = -1;
+	}
+
+	~diskArray()
+	{
+	   
+		fclose(fp);
 	}	
 };
 #endif

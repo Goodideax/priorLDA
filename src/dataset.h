@@ -27,7 +27,9 @@
 #include <string>
 #include <vector>
 #include <map>
-
+#include <iostream>
+#include <cstdio>
+#include <cstdlib>
 using namespace std;
 
 // map of words/terms [string => int]
@@ -35,39 +37,103 @@ typedef map<string, int> mapword2id;
 // map of words/terms [int => string]
 typedef map<int, string> mapid2word;
 
+struct metafile
+{
+	int count;
+	int length;
+};
+
 class document {
 public:
     int * words;
+    int * tags;
     string rawstr;
     int length;
     
+/*    int & words(int id)
+    {
+	return doc_words[id];
+    }
+
+    int & tags(int id)
+    {
+	return doc_tags[id];
+    }
+*/
+    void load(int id,FILE *fp,struct metafile **meta)
+    {
+	int ret;
+	int count;
+	count = meta[id]->count;
+	length = meta[id]->length;
+
+	if(words==NULL)words = (int *)malloc(length*sizeof(int));
+	if(tags==NULL) tags = (int *)malloc(length*sizeof(int));
+//	words = new int[length];
+//	tags = new int[length];
+	ret = fseek(fp,(count-length*2)*sizeof(int),SEEK_SET);
+	if(ret!=0)
+		cerr<<"error in fseek"<<endl;
+	ret = fread(words,sizeof(int),length,fp);
+	if(ret!=length)
+		cerr<<"error in load "<<id<<endl;
+	ret = fread(tags,sizeof(int),length,fp);
+	if(ret!=length)
+		cerr<<"error in load "<<id<<endl;
+    }
+
+    void flush(int id,FILE *fp,struct metafile **meta)
+    {
+	int ret;
+	int count,length;
+	count = meta[id]->count;
+	length = meta[id]->length;
+	fseek(fp,(count-length*2)*sizeof(int),SEEK_SET);
+
+	ret = fwrite(words,sizeof(int),length,fp);
+	if(ret!=length)
+		cerr<<"error in flush doc_words "<<id<<endl;
+	ret = fwrite(tags,sizeof(int),length,fp);
+	if(ret!=length)
+		cerr<<"error in flush doc_tags "<<id<<endl;
+	free(words);
+	free(tags);
+//	delete words;
+//	delete tags;
+    }
+
     document() {
 	words = NULL;
+	tags = NULL;
 	rawstr = "";
-	length = 0;	
+	length = 0;
+	
     }
     
     document(int length) {
 	this->length = length;
 	rawstr = "";
-	words = new int[length];	
+	words = new int[length];
+	tags  = new int[length];	
     }
     
-    document(int length, int * words) {
+    document(int length, int * in_words) {
 	this->length = length;
 	rawstr = "";
 	this->words = new int[length];
+	this->tags  = new int[length];
 	for (int i = 0; i < length; i++) {
-	    this->words[i] = words[i];
+	    this->words[i] = in_words[i];
 	}
     }
 
-    document(int length, int * words, string rawstr) {
+    document(int length, int * in_words, string rawstr) {
 	this->length = length;
 	this->rawstr = rawstr;
 	this->words = new int[length];
+	this->tags  = new int[length];
 	for (int i = 0; i < length; i++) {
-	    this->words[i] = words[i];
+	    this->words[i] = in_words[i];
 	}
     }
     
@@ -75,51 +141,117 @@ public:
 	this->length = doc.size();
 	rawstr = "";
 	this->words = new int[length];
+        this->tags  = new int[length];
 	for (int i = 0; i < length; i++) {
 	    this->words[i] = doc[i];
 	}
     }
 
+    void add_topic(vector<int> &topic){
+	this->length = topic.size();
+	this->tags = new int[length];
+	for(int i=0; i< length; i++) {
+	    this->tags[i] = topic[i];
+	}
+    }
     document(vector<int> & doc, string rawstr) {
 	this->length = doc.size();
 	this->rawstr = rawstr;
 	this->words = new int[length];
+	this->tags  = new int[length];
 	for (int i = 0; i < length; i++) {
 	    this->words[i] = doc[i];
 	}
     }
     
     ~document() {
+	//TODO flush them into the disk
 	if (words) {
 	    delete words;
+	}
+	if (tags) {
+	    delete tags;
 	}
     }
 };
 
+
+
 class dataset {
-public:
+private:
     document ** docs;
+    int current;
+    struct metafile **meta;
+    FILE * fp;
+    public:
     document ** _docs; // used only for inference
     map<int, int> _id2id; // also used only for inference
     int M; // number of documents
-    int V; // number of words
-    
+    int V; // number of words   
+    string dfile;
+    int flag;
+
+
+    void set_dfile(string df)
+    {
+	this->dfile = df;
+	if(TEST) cout<<"dfile is "<<dfile<<endl;
+        this->flag = 1;
+    }
+
+    document * doc(int id)
+    {
+	if(id!=current)
+	{
+/*	   if(docs==NULL){
+		 docs = new document*[M];
+		 int i;
+		 for(i=0;i<M;i++)
+			docs[i] = new document;
+	   }
+*/
+	   
+	   if(docs[id]==NULL) docs[id] = new document;
+//	   if(this->flag) cout<<"dfile is "<<this->dfile<<endl;
+//	   else cout<<"error!"<<endl;
+	   if(fp==NULL) fp = fopen((this->dfile+".cmps").c_str(),"r+b");
+	   if(current != -1) docs[current]->flush(current,fp,meta);
+	   docs[id]->load(id,fp,meta);
+	   current = id;
+	}
+	return docs[id];
+    }
+ 
     dataset() {
 	docs = NULL;
 	_docs = NULL;
+	fp = NULL;
 	M = 0;
 	V = 0;
+	current = -1;
+	dfile = "newdocs.dat";
+	flag = 0;
     }
     
     dataset(int M) {
 	this->M = M;
 	this->V = 0;
-	docs = new document*[M];	
+	docs = new document*[M];
+	meta = new metafile*[M];
+	int i;
+	for(i=0;i<M;i++)
+		docs[i] = new document;	
 	_docs = NULL;
+	fp = NULL;
+	current = -1;
+	dfile = "newdocs.dat";
+	flag = 0;
     }   
-    
+
     ~dataset() {
-	if (docs) {
+	if (docs){
+	    if(current!=-1)
+		docs[current]->flush(current,fp,meta); 
 	    for (int i = 0; i < M; i++) {
 		delete docs[i];
 	    }
@@ -151,9 +283,21 @@ public:
 	delete _docs;
 	_docs = NULL;
     }
-    
+  
+    void add_meta(struct metafile * mfile, int idx){
+        if(0<=idx && idx <M) {
+	   meta[idx] = mfile;
+	}
+    }
+
+  
     void add_doc(document * doc, int idx) {
 	if (0 <= idx && idx < M) {
+	    if(idx!=current){
+		if(current!=-1) 
+			docs[current]->flush(current,fp,meta);
+		current = idx;
+	    }
 	    docs[idx] = doc;
 	}
     }   
@@ -169,6 +313,7 @@ public:
     static int read_wordmap(string wordmapfile, mapid2word * pid2word);
     
     int read_trndata(string dfile, string wordmapfile);
+    int read_trndata_to_compress(string dfile, string wordmapfile);
     int read_newdata(string dfile, string wordmapfile);
     int read_newdata_withrawstrs(string dfile, string wordmapfile);
 };

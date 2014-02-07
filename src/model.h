@@ -75,7 +75,7 @@ public:
     int withrawstrs;
 
     double * p; // temp variable for sampling
-    int ** z; // topic assignments for words, size M x doc.size()
+//    int ** z; // topic assignments for words, size M x doc.size()
     int ** nw; // cwt[i][j]: number of instances of word/term i assigned to topic j, size V x K
     int ** nd; // na[i][j]: number of words in document i assigned to topic j, size M x K
     int * nwsum; // nwsum[j]: total number of words assigned to topic j, size K

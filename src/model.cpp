@@ -53,6 +53,7 @@ model::~model() {
 	delete pnewdata;
     }
 
+/*
     if (z) {
 	for (int m = 0; m < M; m++) {
 	    if (z[m]) {
@@ -60,7 +61,7 @@ model::~model() {
 	    }
 	}
     }
-    
+*/  
     if (nw) {
 	for (int w = 0; w < V; w++) {
 	    if (nw[w]) {
@@ -161,7 +162,7 @@ void model::set_default_values() {
     twords_suffix = ".twords";
     
     dir = "./";
-    dfile = "trndocs.dat";
+    dfile = "trn.dat";
     model_name = "model-final";    
     model_status = MODEL_STATUS_UNKNOWN;
     
@@ -180,7 +181,7 @@ void model::set_default_values() {
     withrawstrs = 0;
     
     p = NULL;
-    z = NULL;
+//    z = NULL;
     nw = NULL;
     nd = NULL;
     nwsum = NULL;
@@ -256,14 +257,14 @@ int model::load_model(string model_name) {
     string line;
 
     // allocate memory for z and ptrndata
-    z = new int*[M];
+//    z = new int*[M];
     ptrndata = new dataset(M);
     ptrndata->V = V;
 
     for (i = 0; i < M; i++) {
 	char * pointer = fgets(buff, BUFF_SIZE_LONG, fin);
 	if (!pointer) {
-	    printf("Invalid word-topic assignment file, check the number of docs!\n");
+	    printf("Invalid word-topic assignment file, check the number of !\n");
 	    return 1;
 	}
 	
@@ -288,13 +289,16 @@ int model::load_model(string model_name) {
 	
 	// allocate and add new document to the corpus
 	document * pdoc = new document(words);
+	pdoc->add_topic(topics);
 	ptrndata->add_doc(pdoc, i);
 	
+/*
 	// assign values for z
 	z[i] = new int[topics.size()];
 	for (j = 0; j < topics.size(); j++) {
 	    z[i][j] = topics[j];
 	}
+*/
     }   
     
     fclose(fin);
@@ -337,10 +341,11 @@ int model::save_model_tassign(string filename) {
 	return 1;
     }
 
-    // wirte docs with topic assignments for words
+    // wirte  with topic assignments for words
     for (i = 0; i < ptrndata->M; i++) {    
-	for (j = 0; j < ptrndata->docs[i]->length; j++) {
-	    fprintf(fout, "%d:%d ", ptrndata->docs[i]->words[j], z[i][j]);
+	for (j = 0; j < ptrndata->doc(i)->length; j++) {
+	    fprintf(fout, "%d:%d ", ptrndata->doc(i)->words[j], ptrndata->doc(i)->tags[j]);
+//		fprintf(fout, "%d:%d ", ptrndata->doc(i)->words[j], z[i][j]);
 	}
 	fprintf(fout, "\n");
     }
@@ -398,7 +403,7 @@ int model::save_model_others(string filename) {
     fprintf(fout, "alpha=%f\n", alpha);
     fprintf(fout, "beta=%f\n", beta);
     fprintf(fout, "ntopics=%d\n", K);
-    fprintf(fout, "ndocs=%d\n", M);
+    fprintf(fout, "n=%d\n", M);
     fprintf(fout, "nwords=%d\n", V);
     fprintf(fout, "liter=%d\n", liter);
     
@@ -480,10 +485,10 @@ int model::save_inf_model_tassign(string filename) {
 	return 1;
     }
 
-    // wirte docs with topic assignments for words
+    // wirte  with topic assignments for words
     for (i = 0; i < pnewdata->M; i++) {    
-	for (j = 0; j < pnewdata->docs[i]->length; j++) {
-	    fprintf(fout, "%d:%d ", pnewdata->docs[i]->words[j], newz[i][j]);
+	for (j = 0; j < pnewdata->doc(i)->length; j++) {
+	    fprintf(fout, "%d:%d ", pnewdata->doc(i)->words[j], newz[i][j]);
 	}
 	fprintf(fout, "\n");
     }
@@ -543,7 +548,7 @@ int model::save_inf_model_others(string filename) {
     fprintf(fout, "alpha=%f\n", alpha);
     fprintf(fout, "beta=%f\n", beta);
     fprintf(fout, "ntopics=%d\n", K);
-    fprintf(fout, "ndocs=%d\n", newM);
+    fprintf(fout, "n=%d\n", newM);
     fprintf(fout, "nwords=%d\n", newV);
     fprintf(fout, "liter=%d\n", inf_liter);
     
@@ -642,18 +647,19 @@ int model::init_est() {
     }
 
     srandom(time(0)); // initialize for random number generation
-    z = new int*[M];
+//    z = new int*[M];
     for (m = 0; m < ptrndata->M; m++) {
-	int N = ptrndata->docs[m]->length;
-	z[m] = new int[N];
+	int N = ptrndata->doc(m)->length;
+//	z[m] = new int[N];
 	
         // initialize for z
         for (n = 0; n < N; n++) {
     	    int topic = (int)(((double)random() / RAND_MAX) * K);
-    	    z[m][n] = topic;
+	    ptrndata->doc(m)->tags[n] = topic;  
+//  	    z[m][n] = topic;
     	    
     	    // number of instances of word i assigned to topic j
-    	    nw[ptrndata->docs[m]->words[n]][topic] += 1;
+    	    nw[ptrndata->doc(m)->words[n]][topic] += 1;
     	    // number of words in document i assigned to topic j
     	    nd[m][topic] += 1;
     	    // total number of words assigned to topic j
@@ -715,13 +721,15 @@ int model::init_estc() {
     }
 
     for (m = 0; m < ptrndata->M; m++) {
-	int N = ptrndata->docs[m]->length;
+	int N = ptrndata->doc(m)->length;
 
 	// assign values for nw, nd, nwsum, and ndsum	
         for (n = 0; n < N; n++) {
-    	    int w = ptrndata->docs[m]->words[n];
-    	    int topic = z[m][n];
+    	    int w = ptrndata->doc(m)->words[n];
+//    	    int topic = z[m][n];
+    	    int topic = ptrndata->doc(m)->tags[n];
     	    
+
     	    // number of instances of word i assigned to topic j
     	    nw[w][topic] += 1;
     	    // number of words in document i assigned to topic j
@@ -760,11 +768,11 @@ void model::estimate() {
 	
 	// for all z_i
 	for (int m = 0; m < M; m++) {
-	    for (int n = 0; n < ptrndata->docs[m]->length; n++) {
+	    for (int n = 0; n < ptrndata->doc(m)->length; n++) {
 		// (z_i = z[m][n])
 		// sample from p(z_i|z_-i, w)
 		int topic = sampling(m, n);
-		z[m][n] = topic;
+		ptrndata->doc(m)->tags[n] = topic;
 	    }
 	}
 	
@@ -785,12 +793,18 @@ void model::estimate() {
     compute_phi();
     liter--;
     save_model(utils::generate_model_name(-1));
+    int i,j;
+    int count = 0;
+    for(i=0;i<V;i++)
+	for(j=0;j<K;j++)
+	    if(nw[i][j]==0) count++;
+    printf("count is %d,total is %d\n",count,V*K);
 }
 
 int model::sampling(int m, int n) {
     // remove z_i from the count variables
-    int topic = z[m][n];
-    int w = ptrndata->docs[m]->words[n];
+    int topic = ptrndata->doc(m)->tags[n];
+    int w = ptrndata->doc(m)->words[n];
     nw[w][topic] -= 1;
     nd[m][topic] -= 1;
     nwsum[topic] -= 1;
@@ -851,12 +865,22 @@ int model::init_est_disk() {
     p = new double[K];
 
     // + read training data
-    ptrndata = new dataset;
-    if (ptrndata->read_trndata(dir + dfile, dir + wordmapfile)) {
+    ptrndata = new dataset(M);
+//    ptrndata->set_dfile(dfile);
+    if(TEST) cout<<"dfile is "<<dfile<<endl;
+/*    if (ptrndata->read_trndata(dir + dfile, dir + wordmapfile)) {
         printf("Fail to read training data!\n");
         return 1;
     }
-		
+*/
+    if(TEST)
+    {
+	printf("Starting to print compressed file\n");
+  	if(ptrndata->read_trndata_to_compress(dir + dfile, dir + wordmapfile)){
+		printf("Fail to read training data!\n");	
+	}
+    }
+    printf("finish compress!\n");	
     // + allocate memory and assign values for variables
     M = ptrndata->M;//Number of documents
     V = ptrndata->V;//Number of words
@@ -901,18 +925,18 @@ int model::init_est_disk() {
     }
 
     srandom(time(0)); // initialize for random number generation
-    z = new int*[M];
+    //z = new int*[M];
     for (m = 0; m < ptrndata->M; m++) {
-	int N = ptrndata->docs[m]->length;
-	z[m] = new int[N];
+	int N = ptrndata->doc(m)->length;
+//	z[m] = new int[N];
 	
         // initialize for z
         for (n = 0; n < N; n++) {
     	    int topic = (int)(((double)random() / RAND_MAX) * K);
-    	    z[m][n] = topic;
+    	    ptrndata->doc(m)->tags[n] = topic;
     	    
     	    // number of instances of word i assigned to topic j
-    	    nw[ptrndata->docs[m]->words[n]][topic] += 1;
+    	    nw[ptrndata->doc(m)->words[n]][topic] += 1;
     	    // number of words in document i assigned to topic j
     	    ND.visit(m,topic) += 1;
     	    // total number of words assigned to topic j
@@ -983,12 +1007,12 @@ int model::init_estc_disk() {
     }
 
     for (m = 0; m < ptrndata->M; m++) {
-	int N = ptrndata->docs[m]->length;
+	int N = ptrndata->doc(m)->length;
 
 	// assign values for nw, nd, nwsum, and ndsum	
         for (n = 0; n < N; n++) {
-    	    int w = ptrndata->docs[m]->words[n];
-    	    int topic = z[m][n];
+    	    int w = ptrndata->doc(m)->words[n];
+    	    int topic = ptrndata->doc(m)->tags[n];
     	    
     	    // number of instances of word i assigned to topic j
     	    nw[w][topic] += 1;
@@ -1030,11 +1054,11 @@ void model::estimate_disk() {
 	
 	// for all z_i
 	for (int m = 0; m < M; m++) {
-	    for (int n = 0; n < ptrndata->docs[m]->length; n++) {
+	    for (int n = 0; n < ptrndata->doc(m)->length; n++) {
 		// (z_i = z[m][n])
 		// sample from p(z_i|z_-i, w)
 		int topic = sampling_disk(m, n);
-		z[m][n] = topic;
+		ptrndata->doc(m)->tags[n] = topic;
 	    }
 	}
 	
@@ -1044,7 +1068,7 @@ void model::estimate_disk() {
 		printf("Saving the model at iteration %d ...\n", liter);
 		compute_theta_disk();
 		compute_phi_disk();
-//		save_model(utils::generate_model_name(liter));
+		save_model(utils::generate_model_name(liter));
 	    }
 	}
     }
@@ -1054,15 +1078,17 @@ void model::estimate_disk() {
     compute_theta_disk();
     compute_phi_disk();
     liter--;
-//    save_model(utils::generate_model_name(-1));
+    if(TEST)
+      	printf("saving the modelING....");
+    save_model(utils::generate_model_name(-1));
 }
 
 int model::sampling_disk(int m, int n) {
     // remove z_i from the count variables
 //    if(TEST)
 //	printf("sampleing_disk: m:%d n:%d\n",m,n);
-    int topic = z[m][n];
-    int w = ptrndata->docs[m]->words[n];
+    int topic = ptrndata->doc(m)->tags[n];
+    int w = ptrndata->doc(m)->words[n];
     nw[w][topic] -= 1;
     ND.visit(m,topic) -= 1;
     nwsum[topic] -= 1;
@@ -1098,6 +1124,8 @@ int model::sampling_disk(int m, int n) {
 }
 
 void model::compute_theta_disk() {
+    if(TEST)
+	printf("Enter the compute_theta_disk\n");
     for (int m = 0; m < M; m++) {
 	for (int k = 0; k < K; k++) {
 	    theta[m][k] = (ND.visit(m,k) + alpha) / (ndsum[m] + K * alpha);
@@ -1106,6 +1134,8 @@ void model::compute_theta_disk() {
 }
 
 void model::compute_phi_disk() {
+    if(TEST)
+	printf("Enter the compute_phi_disk\n");
     for (int k = 0; k < K; k++) {
 	for (int w = 0; w < V; w++) {
 	    phi[k][w] = (nw[w][k] + beta) / (nwsum[k] + V * beta);
@@ -1154,12 +1184,12 @@ int model::init_inf_disk() {
     }
 
     for (m = 0; m < ptrndata->M; m++) {
-	int N = ptrndata->docs[m]->length;
+	int N = ptrndata->doc(m)->length;
 
 	// assign values for nw, nd, nwsum, and ndsum	
         for (n = 0; n < N; n++) {
-    	    int w = ptrndata->docs[m]->words[n];
-    	    int topic = z[m][n];
+    	    int w = ptrndata->doc(m)->words[n];
+    	    int topic = ptrndata->doc(m)->tags[n];
     	    
     	    // number of instances of word i assigned to topic j
     	    nw[w][topic] += 1;
@@ -1218,12 +1248,12 @@ int model::init_inf_disk() {
     srandom(time(0)); // initialize for random number generation
     newz = new int*[newM];
     for (m = 0; m < pnewdata->M; m++) {
-	int N = pnewdata->docs[m]->length;
+	int N = pnewdata->doc(m)->length;
 	newz[m] = new int[N];
 
 	// assign values for nw, nd, nwsum, and ndsum	
         for (n = 0; n < N; n++) {
-    	    int w = pnewdata->docs[m]->words[n];
+    	    int w = pnewdata->doc(m)->words[n];
     	    int _w = pnewdata->_docs[m]->words[n];
     	    int topic = (int)(((double)random() / RAND_MAX) * K);
     	    newz[m][n] = topic;
@@ -1293,12 +1323,12 @@ int model::init_inf() {
     }
 
     for (m = 0; m < ptrndata->M; m++) {
-	int N = ptrndata->docs[m]->length;
+	int N = ptrndata->doc(m)->length;
 
 	// assign values for nw, nd, nwsum, and ndsum	
         for (n = 0; n < N; n++) {
-    	    int w = ptrndata->docs[m]->words[n];
-    	    int topic = z[m][n];
+    	    int w = ptrndata->doc(m)->words[n];
+    	    int topic = ptrndata->doc(m)->tags[n];
     	    
     	    // number of instances of word i assigned to topic j
     	    nw[w][topic] += 1;
@@ -1357,12 +1387,12 @@ int model::init_inf() {
     srandom(time(0)); // initialize for random number generation
     newz = new int*[newM];
     for (m = 0; m < pnewdata->M; m++) {
-	int N = pnewdata->docs[m]->length;
+	int N = pnewdata->doc(m)->length;
 	newz[m] = new int[N];
 
 	// assign values for nw, nd, nwsum, and ndsum	
         for (n = 0; n < N; n++) {
-    	    int w = pnewdata->docs[m]->words[n];
+    	    int w = pnewdata->doc(m)->words[n];
     	    int _w = pnewdata->_docs[m]->words[n];
     	    int topic = (int)(((double)random() / RAND_MAX) * K);
     	    newz[m][n] = topic;
@@ -1404,7 +1434,7 @@ void model::inference() {
 	
 	// for all newz_i
 	for (int m = 0; m < newM; m++) {
-	    for (int n = 0; n < pnewdata->docs[m]->length; n++) {
+	    for (int n = 0; n < pnewdata->doc(m)->length; n++) {
 		// (newz_i = newz[m][n])
 		// sample from p(z_i|z_-i, w)
 		int topic = inf_sampling(m, n);
@@ -1424,7 +1454,7 @@ void model::inference() {
 int model::inf_sampling(int m, int n) {
     // remove z_i from the count variables
     int topic = newz[m][n];
-    int w = pnewdata->docs[m]->words[n];
+    int w = pnewdata->doc(m)->words[n];
     int _w = pnewdata->_docs[m]->words[n];
     newnw[_w][topic] -= 1;
     newnd[m][topic] -= 1;
