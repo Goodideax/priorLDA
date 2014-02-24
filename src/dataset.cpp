@@ -208,10 +208,14 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
     
     // allocate memory for corpus
 //    if (docs) {
-//	deallocate();
-//    } else {
-//	docs = new document*[M];
+//	delete docs;
 //    }
+    docs = new document*[M];
+
+//    if (meta) {
+//	delete meta;
+//    }
+    meta = new metafile*[M];
     
     // set number of words to zero
     V = 0;
@@ -234,15 +238,15 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
 	
 	// allocate new document
 //	document * pdoc = new document(length);
-	struct metafile * pmeta = new struct metafile;
+	metafile * pmeta = new  metafile;
 	int * pdoc = new int[length];	
 	for (int j = 0; j < length; j++) {
 	    it = word2id.find(strtok.token(j));
 	    if (it == word2id.end()) {
 		// word not found, i.e., new word
 //		pdoc->words[j] = word2id.size();
-		word2id.insert(pair<string, int>(strtok.token(j), word2id.size()));
 		pdoc[j] = word2id.size();
+		word2id.insert(pair<string, int>(strtok.token(j), word2id.size()));
 	    } else {
 		pdoc[j] = it->second;
 //		pdoc->words[j] = it->second;
@@ -257,7 +261,6 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
 	fwrite(pdoc,sizeof(int),length,fin_file);
 	fwrite(pdoc,sizeof(int),length,fin_file);
 	add_meta(pmeta,i);
-//	add_doc(pdoc, i);
     }
     if(TEST)
 	printf("Already print all data!\n"); 

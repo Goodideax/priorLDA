@@ -37,8 +37,9 @@ typedef map<string, int> mapword2id;
 // map of words/terms [int => string]
 typedef map<int, string> mapid2word;
 
-struct metafile
+class metafile
 {
+public:
 	int count;
 	int length;
 };
@@ -50,27 +51,15 @@ public:
     string rawstr;
     int length;
     
-/*    int & words(int id)
-    {
-	return doc_words[id];
-    }
 
-    int & tags(int id)
-    {
-	return doc_tags[id];
-    }
-*/
-    void load(int id,FILE *fp,struct metafile **meta)
+    void load(int id,FILE *fp, metafile **meta)
     {
 	int ret;
 	int count;
 	count = meta[id]->count;
 	length = meta[id]->length;
-
-	if(words==NULL)words = (int *)malloc(length*sizeof(int));
-	if(tags==NULL) tags = (int *)malloc(length*sizeof(int));
-//	words = new int[length];
-//	tags = new int[length];
+	words = new int[length];
+	tags = new int[length];
 	ret = fseek(fp,(count-length*2)*sizeof(int),SEEK_SET);
 	if(ret!=0)
 		cerr<<"error in fseek"<<endl;
@@ -82,7 +71,7 @@ public:
 		cerr<<"error in load "<<id<<endl;
     }
 
-    void flush(int id,FILE *fp,struct metafile **meta)
+    void flush(int id,FILE *fp, metafile **meta)
     {
 	int ret;
 	int count,length;
@@ -96,10 +85,10 @@ public:
 	ret = fwrite(tags,sizeof(int),length,fp);
 	if(ret!=length)
 		cerr<<"error in flush doc_tags "<<id<<endl;
-	free(words);
-	free(tags);
-//	delete words;
-//	delete tags;
+	delete words;
+	delete tags;
+	words = NULL;
+	tags = NULL;
     }
 
     document() {
@@ -109,7 +98,7 @@ public:
 	length = 0;
 	
     }
-    
+ 
     document(int length) {
 	this->length = length;
 	rawstr = "";
@@ -180,72 +169,62 @@ public:
 class dataset {
 private:
     document ** docs;
+public:
+    metafile **meta;
     int current;
-    struct metafile **meta;
     FILE * fp;
-    public:
     document ** _docs; // used only for inference
     map<int, int> _id2id; // also used only for inference
     int M; // number of documents
     int V; // number of words   
     string dfile;
-    int flag;
 
 
     void set_dfile(string df)
     {
 	this->dfile = df;
 	if(TEST) cout<<"dfile is "<<dfile<<endl;
-        this->flag = 1;
     }
 
     document * doc(int id)
     {
 	if(id!=current)
 	{
-/*	   if(docs==NULL){
-		 docs = new document*[M];
-		 int i;
-		 for(i=0;i<M;i++)
-			docs[i] = new document;
-	   }
-*/
 	   
 	   if(docs[id]==NULL) docs[id] = new document;
-//	   if(this->flag) cout<<"dfile is "<<this->dfile<<endl;
-//	   else cout<<"error!"<<endl;
-	   if(fp==NULL) fp = fopen((this->dfile+".cmps").c_str(),"r+b");
+	   if(fp==NULL) fp = fopen((dfile+".cmps").c_str(),"r+b");
 	   if(current != -1) docs[current]->flush(current,fp,meta);
 	   docs[id]->load(id,fp,meta);
 	   current = id;
 	}
 	return docs[id];
     }
- 
-    dataset() {
-	docs = NULL;
-	_docs = NULL;
+
+    dataset()
+    {
+	this->M = 0;
+	this->V = 0;
 	fp = NULL;
-	M = 0;
-	V = 0;
+	dfile = "";
 	current = -1;
-	dfile = "newdocs.dat";
-	flag = 0;
+	_docs = NULL;
+	docs = NULL;
+	meta = NULL;
     }
-    
+
     dataset(int M) {
 	this->M = M;
 	this->V = 0;
 	docs = new document*[M];
 	meta = new metafile*[M];
+
+	printf("META IS %p\n",(void *)meta);
 	int i;
 	for(i=0;i<M;i++)
 		docs[i] = new document;	
 	_docs = NULL;
 	fp = NULL;
 	current = -1;
-	dfile = "newdocs.dat";
-	flag = 0;
     }   
 
     ~dataset() {
@@ -285,7 +264,8 @@ private:
     }
   
     void add_meta(struct metafile * mfile, int idx){
-        if(0<=idx && idx <M) {
+        if(meta==NULL) meta = new metafile*[M];
+	if(0<=idx && idx <M) {
 	   meta[idx] = mfile;
 	}
     }

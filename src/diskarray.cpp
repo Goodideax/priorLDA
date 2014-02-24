@@ -26,6 +26,8 @@ void diskArray::init(string name)
 {
 	filename = name;
 	fp = fopen(filename.c_str(),"w+b");
+	if(!fp)
+		cerr<<"error in open ND array FILE"<<endl;
 }
 
 void diskArray::set_length(int rownumber, int len)
@@ -34,6 +36,7 @@ void diskArray::set_length(int rownumber, int len)
 	length = len;
 	fseek(fp,(rows+1)*length*sizeof(int),SEEK_SET);
 	fputc('\n',fp);
+	cached_row = new int[length];
 	
 }
 

@@ -38,8 +38,11 @@ public:
 
 	~diskArray()
 	{
-	   
+/*	  flush();
+	  delete cached_row;
+	  if(fp)
 		fclose(fp);
+*/
 	}	
 };
 #endif

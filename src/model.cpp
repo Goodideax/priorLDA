@@ -259,6 +259,7 @@ int model::load_model(string model_name) {
     // allocate memory for z and ptrndata
 //    z = new int*[M];
     ptrndata = new dataset(M);
+    ptrndata->set_dfile(dfile);
     ptrndata->V = V;
 
     for (i = 0; i < M; i++) {
@@ -608,6 +609,7 @@ int model::init_est() {
 
     // + read training data
     ptrndata = new dataset;
+    ptrndata->set_dfile(dfile);
     if (ptrndata->read_trndata(dir + dfile, dir + wordmapfile)) {
         printf("Fail to read training data!\n");
         return 1;
@@ -864,15 +866,9 @@ int model::init_est_disk() {
 
     p = new double[K];
 
-    // + read training data
-    ptrndata = new dataset(M);
-//    ptrndata->set_dfile(dfile);
+    ptrndata = new dataset;
+    ptrndata->set_dfile(dfile);
     if(TEST) cout<<"dfile is "<<dfile<<endl;
-/*    if (ptrndata->read_trndata(dir + dfile, dir + wordmapfile)) {
-        printf("Fail to read training data!\n");
-        return 1;
-    }
-*/
     if(TEST)
     {
 	printf("Starting to print compressed file\n");
@@ -898,14 +894,7 @@ int model::init_est_disk() {
         }
     }
 	
-/*  nd = new int*[M];
-    for (m = 0; m < M; m++) {
-        nd[m] = new int[K];
-        for (k = 0; k < K; k++) {
-    	    nd[m][k] = 0;
-        }
-    }
-*/
+
     string name = "nd.tmp";
     ND.init(name);
     ND.set_length(M,K);
@@ -925,10 +914,8 @@ int model::init_est_disk() {
     }
 
     srandom(time(0)); // initialize for random number generation
-    //z = new int*[M];
     for (m = 0; m < ptrndata->M; m++) {
 	int N = ptrndata->doc(m)->length;
-//	z[m] = new int[N];
 	
         // initialize for z
         for (n = 0; n < N; n++) {
@@ -1204,6 +1191,7 @@ int model::init_inf_disk() {
     
     // read new data for inference
     pnewdata = new dataset;
+    pnewdata->set_dfile(dfile);
     if (withrawstrs) {
 	if (pnewdata->read_newdata_withrawstrs(dir + dfile, dir + wordmapfile)) {
     	    printf("Fail to read new data!\n");
@@ -1342,7 +1330,8 @@ int model::init_inf() {
     }
     
     // read new data for inference
-    pnewdata = new dataset;
+    pnewdata = new dataset(M);
+    pnewdata->set_dfile(dfile);
     if (withrawstrs) {
 	if (pnewdata->read_newdata_withrawstrs(dir + dfile, dir + wordmapfile)) {
     	    printf("Fail to read new data!\n");
