@@ -48,6 +48,7 @@ int &diskArray::visit(int i,int j)
 		{
 			flush();
 			load(i);
+			cur_row = i;
 		}
 	}
 	else
