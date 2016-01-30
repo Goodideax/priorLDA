@@ -20,18 +20,19 @@
  * along with GibbsLDA++; if not, write to the Free Software Foundation,
  * Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
  */
-
+#define _FILE_OFFSET_BITS    64
 #ifndef	_DATASET_H
 #define	_DATASET_H
-
+#define _FILE_OFFSET_BITS   64
 #include <string>
 #include <vector>
 #include <map>
 #include <iostream>
 #include <cstdio>
 #include <cstdlib>
+#include <errno.h>
 using namespace std;
-
+extern int errno;
 // map of words/terms [string => int]
 typedef map<string, int> mapword2id;
 // map of words/terms [int => string]
@@ -40,7 +41,7 @@ typedef map<int, string> mapid2word;
 class metafile
 {
 public:
-	int count;
+	long long count;
 	int length;
 };
 
@@ -52,44 +53,8 @@ public:
     int length;
     
 
-    void load(int id,FILE *fp, metafile **meta)
-    {
-	int ret;
-	int count;
-	count = meta[id]->count;
-	length = meta[id]->length;
-	words = new int[length];
-	tags = new int[length];
-	ret = fseek(fp,(count-length*2)*sizeof(int),SEEK_SET);
-	if(ret!=0)
-		cerr<<"error in fseek"<<endl;
-	ret = fread(words,sizeof(int),length,fp);
-	if(ret!=length)
-		cerr<<"error in load "<<id<<endl;
-	ret = fread(tags,sizeof(int),length,fp);
-	if(ret!=length)
-		cerr<<"error in load "<<id<<endl;
-    }
-
-    void flush(int id,FILE *fp, metafile **meta)
-    {
-	int ret;
-	int count,length;
-	count = meta[id]->count;
-	length = meta[id]->length;
-	fseek(fp,(count-length*2)*sizeof(int),SEEK_SET);
-
-	ret = fwrite(words,sizeof(int),length,fp);
-	if(ret!=length)
-		cerr<<"error in flush doc_words "<<id<<endl;
-	ret = fwrite(tags,sizeof(int),length,fp);
-	if(ret!=length)
-		cerr<<"error in flush doc_tags "<<id<<endl;
-	delete words;
-	delete tags;
-	words = NULL;
-	tags = NULL;
-    }
+    void load(int id,FILE *fp, metafile *meta);
+    void flush(int id,FILE *fp, metafile *meta);
 
     document() {
 	words = NULL;
@@ -168,9 +133,10 @@ public:
 
 class dataset {
 private:
-    document ** docs;
+    document * docs;
 public:
-    metafile **meta;
+//    metafile **meta;
+    metafile * meta;
     int current;
     FILE * fp;
     document ** _docs; // used only for inference
@@ -178,7 +144,8 @@ public:
     int M; // number of documents
     int V; // number of words   
     string dfile;
-
+    long long pos;
+    int length;
 
     void set_dfile(string df)
     {
@@ -186,19 +153,7 @@ public:
 	if(TEST) cout<<"dfile is "<<dfile<<endl;
     }
 
-    document * doc(int id)
-    {
-	if(id!=current)
-	{
-	   
-	   if(docs[id]==NULL) docs[id] = new document;
-	   if(fp==NULL) fp = fopen((dfile+".cmps").c_str(),"r+b");
-	   if(current != -1) docs[current]->flush(current,fp,meta);
-	   docs[id]->load(id,fp,meta);
-	   current = id;
-	}
-	return docs[id];
-    }
+    document * doc(int id);
 
     dataset()
     {
@@ -209,31 +164,33 @@ public:
 	current = -1;
 	_docs = NULL;
 	docs = NULL;
-	meta = NULL;
+	meta = new metafile;
+	pos = 0;
     }
 
     dataset(int M) {
 	this->M = M;
 	this->V = 0;
-	docs = new document*[M];
-	meta = new metafile*[M];
+	docs = new document;
+	meta = new metafile;
 
 	printf("META IS %p\n",(void *)meta);
-	int i;
-	for(i=0;i<M;i++)
-		docs[i] = new document;	
+//	int i;
+//	for(i=0;i<M;i++)
+//		docs[i] = new document;	
 	_docs = NULL;
 	fp = NULL;
 	current = -1;
+	pos = 0;
     }   
 
     ~dataset() {
 	if (docs){
 	    if(current!=-1)
-		docs[current]->flush(current,fp,meta); 
-	    for (int i = 0; i < M; i++) {
-		delete docs[i];
-	    }
+		docs->flush(current,fp,meta); 
+//	    for (int i = 0; i < M; i++) {
+//		delete docs[i];
+//	    }
 	}
 	delete docs;
 	
@@ -246,11 +203,11 @@ public:
     }
     
     void deallocate() {
-	if (docs) {
-	    for (int i = 0; i < M; i++) {
-		delete docs[i];
-	    }
-	}
+//	if (docs) {
+//	    for (int i = 0; i < M; i++) {
+//		delete docs[i];
+//	    }
+//	}
 	delete docs;
 	docs = NULL;
 
@@ -263,22 +220,15 @@ public:
 	_docs = NULL;
     }
   
-    void add_meta(struct metafile * mfile, int idx){
-        if(meta==NULL) meta = new metafile*[M];
-	if(0<=idx && idx <M) {
-	   meta[idx] = mfile;
-	}
-    }
-
   
     void add_doc(document * doc, int idx) {
 	if (0 <= idx && idx < M) {
 	    if(idx!=current){
 		if(current!=-1) 
-			docs[current]->flush(current,fp,meta);
+			docs->flush(current,fp,meta);
 		current = idx;
 	    }
-	    docs[idx] = doc;
+	    docs = doc;
 	}
     }   
     

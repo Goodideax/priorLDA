@@ -35,6 +35,7 @@
 #include "constants.h"
 #include "dataset.h"
 #include "diskarray.h"
+#include <errno.h>
 using namespace std;
 
 // LDA model

@@ -884,8 +884,11 @@ int model::init_est_disk() {
     // alpha, beta: from command line or default values
     // niters, savestep: from command line or default values
 
-
     // K is the topic number.
+    cout<<V<<" "<<K<<' '<<M<<endl;
+    cout<<"about to begin initial"<<endl;
+    int a;
+//    cin>>a>>a;
     nw = new int*[V];
     for (w = 0; w < V; w++) {
         nw[w] = new int[K];
@@ -893,8 +896,7 @@ int model::init_est_disk() {
     	    nw[w][k] = 0;
         }
     }
-	
-
+    int tmp = ptrndata->doc(m)->length;
     string name = "nd.tmp";
     ND.init(name);
     ND.set_length(M,K);
@@ -902,7 +904,8 @@ int model::init_est_disk() {
 	for( k=0; k<K; k++)
 	   ND.visit(m,k)=0;
     }
-	
+    cout<<"finish initial"<<endl;
+//    cin>>a>>a;
     nwsum = new int[K];
     for (k = 0; k < K; k++) {
 	nwsum[k] = 0;
@@ -912,12 +915,12 @@ int model::init_est_disk() {
     for (m = 0; m < M; m++) {
 	ndsum[m] = 0;
     }
-
     srandom(time(0)); // initialize for random number generation
     for (m = 0; m < ptrndata->M; m++) {
+	//ptrndata->fp = fopen((ptrndata->dfile+".cmps").c_str(),"r+b");
 	int N = ptrndata->doc(m)->length;
-	
         // initialize for z
+	if(m%100000==0) cout<<m<<endl;
         for (n = 0; n < N; n++) {
     	    int topic = (int)(((double)random() / RAND_MAX) * K);
     	    ptrndata->doc(m)->tags[n] = topic;
@@ -932,7 +935,7 @@ int model::init_est_disk() {
         // total number of words in document i
         ndsum[m] = N;      
     }
-    
+/*    
     theta = new double*[M];
     for (m = 0; m < M; m++) {
         theta[m] = new double[K];
@@ -942,7 +945,8 @@ int model::init_est_disk() {
     for (k = 0; k < K; k++) {
         phi[k] = new double[V];
     }    
-    
+*/  
+    cout<<"finish whold initial"<<endl;  
     return 0;
 }
 
@@ -1062,12 +1066,12 @@ void model::estimate_disk() {
     
     printf("Gibbs sampling completed!\n");
     printf("Saving the final model!\n");
-    compute_theta_disk();
-    compute_phi_disk();
+//    compute_theta_disk();
+//    compute_phi_disk();
     liter--;
     if(TEST)
       	printf("saving the modelING....");
-    save_model(utils::generate_model_name(-1));
+//    save_model(utils::generate_model_name(-1));
 }
 
 int model::sampling_disk(int m, int n) {
@@ -1100,7 +1104,7 @@ int model::sampling_disk(int m, int n) {
 	    break;
 	}
     }
-    
+    if(topic==K) topic = K-1; 
     // add newly estimated z_i to count variables
     nw[w][topic] += 1;
     ND.visit(m,topic) += 1;
