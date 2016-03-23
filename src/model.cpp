@@ -32,13 +32,80 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <cstring>
 #include "constants.h"
 #include "strtokenizer.h"
 #include "utils.h"
 #include "dataset.h"
 #include "model.h"
-
 using namespace std;
+static void swap(int &a, int &b)
+{
+	int t;
+	t = a;
+	a = b;
+	b = t;
+	return;
+}
+
+int model::find(int topic, int *nw)
+{
+	int i;
+        int cnt=0;
+	for(i=0;i<K;i++){
+		if((nw[i]&0x3ff)==topic)
+			cnt = nw[i]>>10;
+		if(nw[i]==0) break;
+	}
+        return cnt;
+}
+
+void model::inc(int topic, int word, int *nw)
+{
+	if(topic>=K)
+		cout<<"problem found in inc: "<<topic<<' '<<word<<endl;
+	int i;
+//	if(word==74)
+//		cin>>i>>i;
+//        if(wordCount.find(word)==wordCount.end()) 
+//	    cout<<word<<" not exist!"<<endl;
+//	else
+//	    cout<<word<<" exists"<<endl;
+        int len=wordCount[word];
+	for(i=0;i<min(len,K);i++){
+		if((nw[i]&0x3ff)==topic){
+			nw[i]+=(1<<10);
+			break;
+		}
+		else if(nw[i]==0){
+			nw[i]+=(1<<10);
+			nw[i]|=topic;
+			break;
+		}
+	}
+	for(;i>0;i--)
+		if(nw[i]>nw[i-1]) swap(nw[i],nw[i-1]);
+}
+
+void model::dec(int topic, int word, int *nw)
+{
+	if(topic>=K)
+		cout<<"problem found in inc: "<<topic<<' '<<word<<endl;
+
+	int i;
+	int len = wordCount[word];
+	for(i=0;i<min(K,len);i++){
+		if((nw[i]&0x3ff)==topic){
+			nw[i]-=(1<<10);
+			if((nw[i]>>10) == 0) nw[i]=0;
+			break;
+		}
+	}
+
+	for(;i<min(len,K)-1 && nw[i+1]!=0 ;i++)
+		if(nw[i]<nw[i+1]) swap(nw[i],nw[i+1]);
+
+}
 
 model::~model() {
     if (p) {
@@ -171,12 +238,12 @@ void model::set_default_values() {
     
     M = 0;
     V = 0;
-    K = 100;
+    K = 200;
     alpha = 50.0 / K;
     beta = 0.1;
     niters = 2000;
     liter = 0;
-    savestep = 200;    
+    savestep = 200000;    
     twords = 0;
     withrawstrs = 0;
     
@@ -209,7 +276,7 @@ int model::init(int argc, char ** argv) {
     if (parse_args(argc, argv)) {
 	return 1;
     }
-    
+    cout<<"model_status is "<<model_status<<endl; 
     if (model_status == MODEL_STATUS_EST) {
 	// estimating the model from scratch
 	if (init_est()) {
@@ -237,6 +304,11 @@ int model::init(int argc, char ** argv) {
 	}
     } else if (model_status ==MODEL_STATUS_INF) {
 	if(init_inf_disk()) {
+		return 1;
+	}
+    } else if(model_status == MODEL_STATUS_EST_DISK_SAMPLE) {
+	cout<<"new world!"<<endl;
+	if(init_est_disk_sample()) {
 		return 1;
 	}
     }
@@ -856,7 +928,10 @@ void model::compute_phi() {
 	}
     }
 }
-
+static int min(int a, int b)
+{
+    if(a < b) return a; else return b;
+}
 
 int model::init_est_disk() {
     int m, n, w, k;
@@ -888,15 +963,18 @@ int model::init_est_disk() {
     cout<<V<<" "<<K<<' '<<M<<endl;
     cout<<"about to begin initial"<<endl;
     int a;
-//    cin>>a>>a;
     nw = new int*[V];
+    wordCount = ptrndata->idCount;
     for (w = 0; w < V; w++) {
-        nw[w] = new int[K];
-        for (k = 0; k < K; k++) {
+        if(wordCount[w] <= K)
+        	nw[w] = new int[wordCount[w]];
+	else
+		nw[w] = new int[K];
+        for (k = 0; k < min(wordCount[w],K); k++) {
     	    nw[w][k] = 0;
         }
     }
-    int tmp = ptrndata->doc(m)->length;
+//    int tmp = ptrndata->doc(m)->length;
     string name = "nd.tmp";
     ND.init(name);
     ND.set_length(M,K);
@@ -905,7 +983,6 @@ int model::init_est_disk() {
 	   ND.visit(m,k)=0;
     }
     cout<<"finish initial"<<endl;
-//    cin>>a>>a;
     nwsum = new int[K];
     for (k = 0; k < K; k++) {
 	nwsum[k] = 0;
@@ -922,15 +999,18 @@ int model::init_est_disk() {
         // initialize for z
 	if(m%100000==0) cout<<m<<endl;
         for (n = 0; n < N; n++) {
-    	    int topic = (int)(((double)random() / RAND_MAX) * K);
+    	    int topic = (int)(((double)random() / RAND_MAX) * K)+1;
     	    ptrndata->doc(m)->tags[n] = topic;
-    	    
+//	    cout<<"m,n,topic:"<<m<<' '<<n<<' '<<topic<<endl;
+    	    w = ptrndata->doc(m)->words[n]; 
     	    // number of instances of word i assigned to topic j
-    	    nw[ptrndata->doc(m)->words[n]][topic] += 1;
+    	    inc(topic-1, w, nw[w]);
+//	    for(int i=0;i<min(K,wordCount[w]);i++)
+//		cout<<(nw[w][i]&0x3ff)<<' '<<(nw[w][i]>>10)<<endl;
     	    // number of words in document i assigned to topic j
-    	    ND.visit(m,topic) += 1;
+    	    ND.visit(m,topic-1) += 1;
     	    // total number of words assigned to topic j
-    	    nwsum[topic] += 1;
+    	    nwsum[topic-1] += 1;
         } 
         // total number of words in document i
         ndsum[m] = N;      
@@ -950,6 +1030,214 @@ int model::init_est_disk() {
     return 0;
 }
 
+int model::init_est_disk_sample() {
+    int m, n, w, k;
+    tcount=0;
+    if(TEST)
+	printf("Entering: init_est_disk_sample()\n");
+
+    p = new double[K];
+
+    ptrndata = new dataset;
+    ptrndata->set_dfile(dfile);
+    if(TEST) cout<<"dfile is "<<dfile<<endl;
+    if(TEST)
+    {
+	printf("Starting to print compressed file\n");
+  	if(ptrndata->read_trndata_to_compress(dir + dfile, dir + wordmapfile)){
+		printf("Fail to read training data!\n");	
+	}
+    }
+    printf("finish compress!\n");	
+    // + allocate memory and assign values for variables
+    M = ptrndata->M;//Number of documents
+    V = ptrndata->V;//Number of words
+    // K: from command line or default value
+    // alpha, beta: from command line or default values
+    // niters, savestep: from command line or default values
+
+    // K is the topic number.
+    cout<<V<<" "<<K<<' '<<M<<endl;
+    cout<<"about to begin initial"<<endl;
+    int a;
+    nw = new int*[V];
+    wordCount = ptrndata->idCount;
+    for (w = 0; w < V; w++) {
+        if(wordCount[w] <= K)
+        	nw[w] = new int[wordCount[w]];
+	else
+		nw[w] = new int[K];
+        for (k = 0; k < min(wordCount[w],K); k++) {
+    	    nw[w][k] = 0;
+        }
+    }
+//    int tmp = ptrndata->doc(m)->length;
+    string name = "nd.tmp";
+    ND.init(name);
+    ND.set_length(M,K);
+    for(m=0; m<M; m++){
+	for( k=0; k<K; k++)
+	   ND.visit(m,k)=0;
+    }
+    cout<<"finish initial"<<endl;
+    nwsum = new int[K];
+    for (k = 0; k < K; k++) {
+	nwsum[k] = 0;
+    }
+    
+    ndsum = new int[M];
+    for (m = 0; m < M; m++) {
+	ndsum[m] = 0;
+    }
+    srandom(time(0)); // initialize for random number generation
+    for (m = 0; m < ptrndata->M; m++) {
+        if(((double)random()/RAND_MAX) < sample_rate) {
+	    sdoc.push_back(m);
+	    cout<<m<<' '<<endl;
+	}
+	else
+	    continue;
+	//ptrndata->fp = fopen((ptrndata->dfile+".cmps").c_str(),"r+b");
+	int N = ptrndata->doc(m)->length;
+        // initialize for z
+	if(m%100000==0) cout<<m<<endl;
+        for (n = 0; n < N; n++) {
+    	    int topic = (int)(((double)random() / RAND_MAX) * K)+1;
+    	    ptrndata->doc(m)->tags[n] = topic;
+	    if(topic>K+1)
+		cout<<"bad topic:"<<topic<<endl;
+    	    w = ptrndata->doc(m)->words[n]; 
+    	    // number of instances of word i assigned to topic j
+    	    inc(topic-1, w, nw[w]);
+    	    // number of words in document i assigned to topic j
+    	    ND.visit(m,topic-1) += 1;
+    	    // total number of words assigned to topic j
+    	    nwsum[topic-1] += 1;
+        } 
+        // total number of words in document i
+        ndsum[m] = N;
+    }
+    estimate_disk_sample();
+    cout<<"finish sample estimate"<<endl;
+    for(m=0; m< ptrndata->M; m++) {
+	if(ndsum[m]!=0) continue;
+	ssum = 0;
+	rsum = 0;
+	int tmpnd[K];
+	int tmpsum,tmpcur;
+	memset(tmpnd,0,sizeof(tmpnd));
+	for( int i=0;i<ptrndata->doc(m)->length;i++)
+	{
+		int w = ptrndata->doc(m)->words[i];
+		int len = wordCount[i];
+		int j;
+		tmpsum = 0;
+		for(j=0;j<min(len,K);j++)
+		{
+			if(nw[w][j]==0) break;
+			tmpsum+= (nw[w][j]>>10);
+//			tmpnd[nw[w][j]&0x3ff]+= (nw[w][j]>>10);
+		}
+		double rand = ((double) random()/ RAND_MAX)*tmpsum;
+		for(j=0;j<min(len,K);j++)
+		{
+			tmpcur+=(nw[w][j]>>10);
+			if(tmpcur>=rand) break;
+		}
+		if(tmpcur<rand) j = min(len,K)-1;
+		tmpnd[nw[w][j]&0x3ff]++;
+	}
+	for( int i=0; i<K; i++)
+		ND.visit(m,i) = tmpnd[i];
+	double tmp;
+	for( int t = 0; t < K; t++)
+        {
+            tmp = alpha * beta / (beta*V + nwsum[t]);
+	    ssum +=tmp;
+            rsum += ND.visit(m,t)*beta / (beta*V + nwsum[t]);
+	    q1[t] = (alpha + ND.visit(m,t)) / (beta*V + nwsum[t]);
+//	    cout<<"q1[t], ND: "<<q1[t]<<' '<<ND.visit(m,t)<<endl;
+        }
+//	cout<<"initial ssum: "<<ssum<<endl;
+        for (int n = 0; n < ptrndata->doc(m)->length; n++) {
+	    // (z_i = z[m][n])
+	    // sample from p(z_i|z_-i, w)
+	    
+	    int topic = sampling_disk(m, n);
+ 	    int oldtopic = ptrndata->doc(m)->tags[n];
+	    ptrndata->doc(m)->tags[n] = topic;
+        }
+	memset(tmpnd,0,sizeof(tmpnd));
+	for( int i=0;i<ptrndata->doc(m)->length; i++)
+		tmpnd[ptrndata->doc(m)->tags[i]-1]++;
+	for( int i=0;i<K;i++)
+		ND.visit(m,i) = tmpnd[i];
+    }
+    cout<<"finish initial"<<endl;  
+    return 0;
+}
+
+void model::estimate_disk_sample() {
+    int m;
+    if(TEST)
+	printf("Entering: estimate_disk_sample\n");
+    if (twords > 0) {
+	// print out top words per topic
+	dataset::read_wordmap(dir + wordmapfile, &id2word);
+    }
+
+    printf("Sampling %d iterations!\n", niters);
+    q1 = new double[K];
+    int last_iter = liter;
+    for (liter = last_iter + 1; liter <= niters + last_iter; liter++) {
+	printf("Iteration %d ...\n", liter);
+	cout<<"sdoc size is "<<sdoc.size()<<endl;	
+	// for all z_i
+//	for (int i=0;i<ptrndata->M; i++)
+//		cout<<i<<' '<<ndsum[i]<<endl;
+	for (int i = 0; i < sdoc.size(); i++) {
+	    m = sdoc[i];
+	    ssum = rsum = qsum = 0;
+            for( int t = 0; t < K; t++)
+            {
+                ssum += alpha * beta / (beta*V + nwsum[t]);
+                rsum += ND.visit(m,t)*beta / (beta*V + nwsum[t]);
+		q1[t] = (alpha + ND.visit(m,t)) / (beta*V + nwsum[t]);
+//	    	cout<<"q1[t], ND: "<<q1[t]<<' '<<ND.visit(m,t)<<endl;
+            }
+	    for (int n = 0; n < ptrndata->doc(m)->length; n++) {
+		// (z_i = z[m][n])
+		// sample from p(z_i|z_-i, w)
+		int topic = sampling_disk(m, n);
+ 		int oldtopic = ptrndata->doc(m)->tags[n];
+		ptrndata->doc(m)->tags[n] = topic;
+		if(topic>K+1 || topic <=0)
+			cout<<"invalid topic: "<<topic<<" m,n:"<<m<<' '<<n<<endl;
+
+	    }
+	
+	}
+
+	if (savestep > 0) {
+	    if (liter % savestep == 0) {
+		// saving the model
+		printf("Saving the model at iteration %d ...\n", liter);
+		compute_theta_disk();
+		compute_phi_disk();
+		save_model(utils::generate_model_name(liter));
+	    }
+	}
+    }
+    
+    printf("Gibbs sampling completed!\n");
+    printf("Saving the final model!\n");
+//    compute_theta_disk();
+//    compute_phi_disk();
+    liter--;
+    if(TEST)
+      	printf("saving the modelING....");
+//    save_model(utils::generate_model_name(-1));
+}
 
 int model::init_estc_disk() {
     // estimating the model from a previously estimated one
@@ -1038,21 +1326,38 @@ void model::estimate_disk() {
     }
 
     printf("Sampling %d iterations!\n", niters);
-
+    q1 = new double[K];
     int last_iter = liter;
     for (liter = last_iter + 1; liter <= niters + last_iter; liter++) {
 	printf("Iteration %d ...\n", liter);
-	
+	int diff = 0;
 	// for all z_i
+	int oldND[K];
 	for (int m = 0; m < M; m++) {
+	    ssum = rsum = qsum = 0;
+            for( int t = 0; t < K; t++)
+            {
+                ssum += alpha * beta / (beta*V + nwsum[t]);
+                rsum += ND.visit(m,t)*beta / (beta*V + nwsum[t]);
+		q1[t] = (alpha + ND.visit(m,t)) / (beta*V + nwsum[t]);
+	        oldND[t] = ND.visit(m,t);
+            }
+	    if(rsum<0) cout<<"rsum is invalid: "<<rsum<<endl;
 	    for (int n = 0; n < ptrndata->doc(m)->length; n++) {
 		// (z_i = z[m][n])
 		// sample from p(z_i|z_-i, w)
+//		cout<<"m,n,topic: "<<m<<' '<<n<<' '<<ptrndata->doc(m)->tags[n]<<' '<<ptrndata->doc(m)->words[n]<<endl;
 		int topic = sampling_disk(m, n);
+		if(topic>K+1 || topic <=0)
+			cout<<"invalid topic: "<<topic<<" m,n:"<<m<<' '<<n<<endl;
+ 		int oldtopic = ptrndata->doc(m)->tags[n];
 		ptrndata->doc(m)->tags[n] = topic;
 	    }
+	    for( int t=0;t<K;t++)
+		diff += abs(oldND[t]-ND.visit(m,t));
+
 	}
-	
+	cout<<"diff in iteration "<<liter<<" is "<<diff<<endl;
 	if (savestep > 0) {
 	    if (liter % savestep == 0) {
 		// saving the model
@@ -1063,9 +1368,13 @@ void model::estimate_disk() {
 	    }
 	}
     }
-    
+//    for( int m = 0; m<M; m++) {
+//	for( int n = 0; n< ptrndata->doc(m)->length; n++)
+//		cout<<"m,n,topic: "<<m<<' '<<n<<' '<<ptrndata->doc(m)->tags[n]<<endl;
+//    } 
     printf("Gibbs sampling completed!\n");
     printf("Saving the final model!\n");
+    cout<<"tcount is "<<tcount<<endl;
 //    compute_theta_disk();
 //    compute_phi_disk();
     liter--;
@@ -1079,39 +1388,94 @@ int model::sampling_disk(int m, int n) {
 //    if(TEST)
 //	printf("sampleing_disk: m:%d n:%d\n",m,n);
     int topic = ptrndata->doc(m)->tags[n];
+//    cout<<"m,n: "<<m<<' '<<n<<" topic: "<<topic<<endl;
+    int ret;
     int w = ptrndata->doc(m)->words[n];
-    nw[w][topic] -= 1;
-    ND.visit(m,topic) -= 1;
-    nwsum[topic] -= 1;
-    ndsum[m] -= 1;
-
     double Vbeta = V * beta;
     double Kalpha = K * alpha;    
-    // do multinomial sampling via cumulative method
-    for (int k = 0; k < K; k++) {
-	p[k] = (nw[w][k] + beta) / (nwsum[k] + Vbeta) *
-		    (ND.visit(m,k) + alpha) / (ndsum[m] + Kalpha);
+    int t;
+    int len;
+    int k;
+//    cout<<rsum<<endl;   
+    if(topic!=0){
+	ssum -= alpha * beta / ( Vbeta + nwsum[topic-1]);
+        rsum -= ND.visit(m,topic-1) * beta / (Vbeta + nwsum[topic-1]);
+//	cout<<rsum<<endl;
+	dec(topic-1,w,nw[w]); 
+	ND.visit(m,topic-1) -= 1;
+	nwsum[topic-1] -= 1;
+	ndsum[m] -= 1;
+	if(ndsum[m]<0)
+		cout<<"wrong ndsum m,n,topic: "<<ndsum[m]<<' '<<m<<' '<<n<<' '<<topic<<endl;
+
+	ssum += alpha * beta / (Vbeta + nwsum[topic-1]);
+	rsum += ND.visit(m,topic-1) * beta / (Vbeta + nwsum[topic-1]);
+	q1[topic-1]= (alpha + ND.visit(m,topic-1))/(Vbeta + nwsum[topic-1]);
+//        cout<<rsum<<endl;
     }
-    // cumulate multinomial parameters
-    for (int k = 1; k < K; k++) {
-	p[k] += p[k - 1];
+    double tsum = 0;
+    for(int r=0;r<K;r++)
+	tsum += ND.visit(m,r) * beta / (Vbeta + nwsum[r]);
+//    cout<<"real rsum: "<<tsum<<endl;
+    qsum=0;
+    len = wordCount[w];
+//    cout<<len<<' '<<K<<endl;
+//    for(int i=0;i<min(K,wordCount[w]);i++)
+//	cout<<(nw[w][i]&0x3ff)<<' '<<(nw[w][i]>>10)<<endl;
+    for(k=0; k<min(len,K); k++)
+    {
+        if(nw[w][k]==0) break;
+        t = nw[w][k]&0x3ff;
+        p[k]=q1[t]*(nw[w][k]>>10);
+	qsum+=p[k];
+	if(t>=K) 
+        	cout<<k<<' '<<p[k]<<' '<<t<<' '<<(nw[w][k]>>10)<<' '<<q1[t]<<' '<<nwsum[t]<<' '<<ND.visit(m,t)<<endl;
     }
+    len = k;    
     // scaled sample because of unnormalized p[]
-    double u = ((double)random() / RAND_MAX) * p[K - 1];
-    
-    for (topic = 0; topic < K; topic++) {
-	if (p[topic] > u) {
-	    break;
-	}
+    double u = ((double)random() / RAND_MAX) * (ssum+rsum+qsum);
+//    cout<<"ssum,rsum,qsum,u: "<<ssum<<' '<<rsum<<' '<<qsum<<' '<<u<<endl;
+    if(rsum<0) cout<<"ND "<<ND.visit(m,topic-1)<<endl;
+    if(u<=qsum) {
+        for(k=1; k<len; k++)
+            p[k]+=p[k-1];
+        for(ret = 0; ret < len; ret++)
+            if (p[ret] >= u){ 
+		ret = nw[w][ret]&0x3ff;
+		break;
+	    }
+        if(ret==len)
+	    ret = len-1;
+        tcount+=len;
     }
-    if(topic==K) topic = K-1; 
-    // add newly estimated z_i to count variables
-    nw[w][topic] += 1;
-    ND.visit(m,topic) += 1;
-    nwsum[topic] += 1;
+    else {
+	tcount+=K;
+        for(k=0; k<K; k++)
+            p[k]=(ND.visit(m,k)+alpha)*beta / (Vbeta + nwsum[k]);
+        for(k=1; k<K; k++)
+            p[k] += p[k-1];
+        for(ret = 0; ret<K; ret++)
+            if(p[ret] > u- qsum) 
+		break;
+        if(ret==K) ret = K -1;
+//	cout<<p[K-1]<<' '<<ssum+rsum<<endl;
+    }
+    ret++;
+     
+    ssum -= alpha * beta / (Vbeta + nwsum[ret-1]);
+    rsum -= ND.visit(m, ret-1) * beta / (Vbeta + nwsum[ret-1]);
+    inc(ret-1,w,nw[w]);
+    ND.visit(m,ret-1) += 1;
+    nwsum[ret-1] += 1;
     ndsum[m] += 1;    
-    
-    return topic;
+    ssum += alpha * beta / (Vbeta + nwsum[ret-1]);
+    rsum += ND.visit(m,ret-1) * beta / (Vbeta + nwsum[ret-1]);
+    q1[ret-1] = (alpha + ND.visit(m,ret-1)) / (Vbeta + nwsum[ret-1]);
+//    cout<<rsum<<endl;
+    if(ret==0)
+      cout<<"ssum,rsum,qsum,u,len: "<<ssum<<' '<<rsum<<' '<<qsum<<' '<<u<<' '<<len<<endl;
+//    cout<<"old, new topic: "<<topic<<' '<<ret<<endl;
+    return ret;
 }
 
 void model::compute_theta_disk() {

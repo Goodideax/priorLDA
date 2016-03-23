@@ -1,10 +1,10 @@
-CC=		g++
+CC=		g++ -std=c++11
 
 OBJS=		strtokenizer.o dataset.o utils.o model.o diskarray.o
 MAIN=		lda
  
 all:	$(OBJS) $(MAIN).cpp
-	$(CC) -o $(MAIN) $(MAIN).cpp $(OBJS) -g
+	$(CC) -o $(MAIN) $(MAIN).cpp $(OBJS) -g 
 #	strip $(MAIN)
 
 strtokenizer.o:	strtokenizer.h strtokenizer.cpp

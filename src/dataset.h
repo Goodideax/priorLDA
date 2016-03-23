@@ -37,12 +37,15 @@ extern int errno;
 typedef map<string, int> mapword2id;
 // map of words/terms [int => string]
 typedef map<int, string> mapid2word;
+// counter of each id
+typedef map<int, int> idCounter;
+
 
 class metafile
 {
 public:
 	long long count;
-	int length;
+	long long length;
 };
 
 class document {
@@ -50,8 +53,7 @@ public:
     int * words;
     int * tags;
     string rawstr;
-    int length;
-    
+    long long length;
 
     void load(int id,FILE *fp, metafile *meta);
     void flush(int id,FILE *fp, metafile *meta);
@@ -135,10 +137,10 @@ class dataset {
 private:
     document * docs;
 public:
-//    metafile **meta;
-    metafile * meta;
+    metafile *meta;
     int current;
     FILE * fp;
+    FILE * fmeta;
     document ** _docs; // used only for inference
     map<int, int> _id2id; // also used only for inference
     int M; // number of documents
@@ -146,6 +148,7 @@ public:
     string dfile;
     long long pos;
     int length;
+    idCounter idCount;
 
     void set_dfile(string df)
     {
@@ -164,8 +167,8 @@ public:
 	current = -1;
 	_docs = NULL;
 	docs = NULL;
-	meta = new metafile;
 	pos = 0;
+	meta = new metafile;
     }
 
     dataset(int M) {
@@ -173,8 +176,6 @@ public:
 	this->V = 0;
 	docs = new document;
 	meta = new metafile;
-
-	printf("META IS %p\n",(void *)meta);
 //	int i;
 //	for(i=0;i<M;i++)
 //		docs[i] = new document;	
@@ -230,7 +231,8 @@ public:
 	    }
 	    docs = doc;
 	}
-    }   
+    }
+
     
     void _add_doc(document * doc, int idx) {
 	if (0 <= idx && idx < M) {

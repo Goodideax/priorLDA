@@ -40,7 +40,8 @@ int main(int argc, char ** argv) {
 	lda.estimate();
     }
    
-    if (lda.model_status == MODEL_STATUS_EST_DISK || lda.model_status == MODEL_STATUS_ESTC_DISK) {
+    if (lda.model_status == MODEL_STATUS_EST_DISK || lda.model_status == MODEL_STATUS_ESTC_DISK ||
+ 	lda.model_status == MODEL_STATUS_EST_DISK_SAMPLE) {
 	// parameter estimation
 	lda.estimate_disk();
     }

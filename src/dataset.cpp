@@ -33,6 +33,7 @@ using namespace std;
 extern int errno;
 document * dataset::doc(int id)
     {
+        int ret;
         if(id!=current)
         {
            if(docs==NULL) docs = new document;
@@ -47,10 +48,13 @@ document * dataset::doc(int id)
                 fseek(fp,0,SEEK_SET);
                 pos = 0;
            }
-           fread(&length,sizeof(int),1,fp);
-           pos += 1 + 2 * length;
-           meta->count = pos;
-           meta->length = length;
+	   if(fmeta==NULL) fmeta = fopen((str+dfile+".meta").c_str(),"r+b");
+	   if(fmeta == NULL) {
+		printf("%d\n", errno);
+		cout<<"open meta file failed"<<endl;
+	   }
+	   ret = fseeko(fmeta,(id*2)*sizeof(long long), SEEK_SET);
+	   ret = fread(meta,sizeof(long long),2,fmeta);
            docs->load(id,fp,meta);
            current = id;
         }
@@ -60,9 +64,11 @@ document * dataset::doc(int id)
 void document::load(int id,FILE *fp, metafile *meta)
 {
         int ret;
-        long long count;
+        long long count,length;
         count = meta->count;
         length = meta->length;
+	this->length = length;
+        //cout<<this->length<<endl;
         words = new int[length];
         tags = new int[length];
         ret = fseeko(fp,(count-length*2)*sizeof(int),SEEK_SET);
@@ -266,7 +272,7 @@ int dataset::read_trndata(string dfile, string wordmapfile) {
 }
 int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
     mapword2id word2id;
-    
+//    idCounter idCount;
     FILE * fin = fopen(dfile.c_str(), "r");
     if (!fin) {
 	printf("Cannot open file %s to read!\n", dfile.c_str());
@@ -309,14 +315,14 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
     V = 0;
 //add back
     FILE * fin_file = fopen((dfile+".cmps").c_str(),"wb");
-//    FILE * fin_file_meta = fopen((dfile+".meta").c_str(),"w");
-    long long count=0;
+    FILE * fin_file_meta = fopen((dfile+".meta").c_str(),"w");
+    long long count=0, length;
     for (int i = 0; i < M; i++) {
 	if(i%100000==0) cout<<i<<' '<<count<<endl;
 	fgets(buff, BUFF_SIZE_LONG - 1, fin);
 	line = buff;
 	strtokenizer strtok(line, " \t\r\n");
-	int length = strtok.count_tokens();
+	length = strtok.count_tokens();
 
 	if (length <= 0) {
 	    printf("Invalid (empty) document!\n");
@@ -327,7 +333,7 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
 	
 	// allocate new document
 //	document * pdoc = new document(length);
-//	metafile * pmeta = new  metafile;
+	metafile * pmeta = new  metafile;
 	
 	int * pdoc = new int[length];	
 	for (int j = 0; j < length; j++) {
@@ -336,28 +342,34 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
 		// word not found, i.e., new word
 //		pdoc->words[j] = word2id.size();
 		pdoc[j] = word2id.size();
+        	idCount.insert(pair<int, int>(word2id.size(),1));
 		word2id.insert(pair<string, int>(strtok.token(j), word2id.size()));
-	    } else {
+	    } 
+            else {
 		pdoc[j] = it->second;
+		idCount[it->second]+=1;
 //		pdoc->words[j] = it->second;
 	    }
 	}
 	// add new doc to the corpus
-//	pmeta->count = count;
-//	pmeta->length = length;
+        count+=2*length;
+	pmeta->count = count;
+	pmeta->length = length;
+//        cout<<i<<' '<<count<<' '<<length<<endl;
 //add back
 //	fprintf(fin_file_meta,"%d %d %d\n",i,count,length);
-	count+=(1+2*length)*sizeof(int);
-	fwrite(&length, sizeof(int), 1, fin_file);
+//	count+=(1+2*length)*sizeof(int);
+//	fwrite(&length, sizeof(int), 1, fin_file);
 	fwrite(pdoc,sizeof(int),length,fin_file);
+	memset(pdoc,0,length*sizeof(int));
 	fwrite(pdoc,sizeof(int),length,fin_file);
-//	add_meta(pmeta,i);
+	fwrite(pmeta,sizeof(long long),2,fin_file_meta);
 	delete pdoc;
     }
     if(TEST)
 	printf("Already print all data!\n"); 
     fclose(fin);
-//    fclose(fin_file_meta);
+    fclose(fin_file_meta);
     fclose(fin_file);
     // write word map to file
     if (write_wordmap(wordmapfile, &word2id)) {

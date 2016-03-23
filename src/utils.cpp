@@ -42,11 +42,12 @@ int utils::parse_args(int argc, char ** argv, model * pmodel) {
     int savestep = 0;
     int twords = 0;
     int withrawdata = 0;
+    int sample = 0;
 
     int i = 0; 
     while (i < argc) {
 	string arg = argv[i];
-	
+	cout<<arg<<endl;	
 	if (arg == "-est") {
 	    model_status = MODEL_STATUS_EST;
 	    
@@ -95,6 +96,10 @@ int utils::parse_args(int argc, char ** argv, model * pmodel) {
 	} else if (arg == "-withrawdata") {
 	    withrawdata = 1;
 	
+	} else if (arg == "-est_ds") {
+	    cout<<"enter assignment"<<endl;
+	    model_status = MODEL_STATUS_EST_DISK_SAMPLE;
+
 	} else {
 	    // any more?
 	}	
@@ -149,7 +154,7 @@ int utils::parse_args(int argc, char ** argv, model * pmodel) {
 	    printf("dfile = %s\n", pmodel->dfile.c_str());
 	}
     } 
-    if (model_status == MODEL_STATUS_EST_DISK) {
+    if (model_status == MODEL_STATUS_EST_DISK || model_status == MODEL_STATUS_EST_DISK_SAMPLE) {
 	if (dfile == "") {
 	    printf("Please specify the input data file for model estimation!\n");
 	    return 1;

@@ -36,6 +36,7 @@
 #include "dataset.h"
 #include "diskarray.h"
 #include <errno.h>
+#include <vector>
 using namespace std;
 
 // LDA model
@@ -63,7 +64,9 @@ public:
     dataset * pnewdata; // pointer to new dataset object
 
     mapid2word id2word; // word map [int => string]
-    
+   
+    double sample_rate = 0.1;
+    vector<int> sdoc; //the id store for the selected document; 
     // --- model parameters and variables ---    
     int M; // dataset size (i.e., number of docs)
     int V; // vocabulary size
@@ -88,7 +91,13 @@ public:
     diskArray NW;//A disk-based nw array;
     diskArray NEWND;//A disk-based newnd array;
     diskArray NEWNW;//A disk-based newnw array;
-    
+
+    idCounter wordCount;//counter for each word
+    double ssum;//record sum s, for speed up sampling
+    double rsum;//record sum r, for speed up sampling
+    double qsum;//record sum q, for speed up sampling
+    double *q1;//coefficient of q for each topic
+    long long tcount;//actual inner loop time;
     // for inference only
     int inf_liter;
     int newM;
@@ -107,7 +116,11 @@ public:
     }
           
     ~model();
-    
+
+    int find(int, int*);
+    void inc(int, int, int*);
+    void dec(int, int, int*);   
+ 
     // set default values for variables
     void set_default_values();   
 
@@ -162,13 +175,15 @@ public:
     // init for disk_based estimation
     int init_est_disk();
     int init_estc_disk();
+    int init_est_disk_sample();
 
     // estimate LDA model using Gibbs sampling with disk-based storage.
     void estimate_disk();
     int sampling_disk(int m, int n);
     void compute_theta_disk();
     void compute_phi_disk();
-
+    void estimate_disk_sample();
+    
     int init_inf_disk();
 
 };
