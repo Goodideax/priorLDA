@@ -48,18 +48,6 @@ static void swap(int &a, int &b)
 	return;
 }
 
-int model::find(int topic, int *nw)
-{
-	int i;
-        int cnt=0;
-	for(i=0;i<K;i++){
-		if((nw[i]&0x3ff)==topic)
-			cnt = nw[i]>>10;
-		if(nw[i]==0) break;
-	}
-        return cnt;
-}
-
 void model::inc(int topic, int word, int *nw)
 {
 	if(topic>=K)
