@@ -1050,6 +1050,7 @@ int model::init_est_disk_sample() {
     int a;
     nw = new int*[V];
     wordCount = ptrndata->idCount;
+/*
     for (w = 0; w < V; w++) {
         if(wordCount[w] <= K)
         	nw[w] = new int[wordCount[w]];
@@ -1059,6 +1060,7 @@ int model::init_est_disk_sample() {
     	    nw[w][k] = 0;
         }
     }
+*/
 //    int tmp = ptrndata->doc(m)->length;
     string name = "nd.tmp";
     ND.init(name);
@@ -1067,6 +1069,7 @@ int model::init_est_disk_sample() {
 	for( k=0; k<K; k++)
 	   ND.visit(m,k)=0;
     }
+    nw_idx = new set<int>[V];
     cout<<"finish initial"<<endl;
     nwsum = new int[K];
     for (k = 0; k < K; k++) {
@@ -1096,7 +1099,10 @@ int model::init_est_disk_sample() {
 		cout<<"bad topic:"<<topic<<endl;
     	    w = ptrndata->doc(m)->words[n]; 
     	    // number of instances of word i assigned to topic j
-    	    inc(topic-1, w, nw[w]);
+	    pair<int,int> idx = make_pair(topic-1,w);
+	    nwmap[idx]++;
+	    nw_idx[w].insert(topic-1);
+//    	    inc(topic-1, w, nw[w]);
     	    // number of words in document i assigned to topic j
     	    ND.visit(m,topic-1) += 1;
     	    // total number of words assigned to topic j
@@ -1120,21 +1126,40 @@ int model::init_est_disk_sample() {
 		int len = wordCount[i];
 		int j;
 		tmpsum = 0;
+		for(const auto &idx : nw_idx[w])
+		{
+			tmpsum+=nwmap[make_pair(idx,w)];
+		}
+/*
 		for(j=0;j<min(len,K);j++)
 		{
 			if(nw[w][j]==0) break;
 			tmpsum+= (nw[w][j]>>10);
 //			tmpnd[nw[w][j]&0x3ff]+= (nw[w][j]>>10);
 		}
+*/
 		double rand = ((double) random()/ RAND_MAX)*tmpsum;
-		for(j=0;j<min(len,K);j++)
+		for(const auto &idx : nw_idx[w])
+		{
+			int tmp = nwmap[make_pair(idx,w)];
+			tmpcur+=tmp;
+			if(tmpcur>=rand){
+				
+				tmpnd[idx]++;
+				break;
+			};
+		}
+/*		for(j=0;j<min(len,K);j++)
 		{
 			tmpcur+=(nw[w][j]>>10);
 			if(tmpcur>=rand) break;
 		}
 		if(tmpcur<rand) j = min(len,K)-1;
 		tmpnd[nw[w][j]&0x3ff]++;
+*/
+
 	}
+
 	for( int i=0; i<K; i++)
 		ND.visit(m,i) = tmpnd[i];
 	double tmp;
@@ -1389,7 +1414,9 @@ int model::sampling_disk(int m, int n) {
 	ssum -= alpha * beta / ( Vbeta + nwsum[topic-1]);
         rsum -= ND.visit(m,topic-1) * beta / (Vbeta + nwsum[topic-1]);
 //	cout<<rsum<<endl;
-	dec(topic-1,w,nw[w]); 
+        if((--nwmap[make_pair(topic-1,w)]) == 0)
+		nw_idx[w].erase(topic-1);
+//	dec(topic-1,w,nw[w]);
 	ND.visit(m,topic-1) -= 1;
 	nwsum[topic-1] -= 1;
 	ndsum[m] -= 1;
@@ -1410,7 +1437,14 @@ int model::sampling_disk(int m, int n) {
 //    cout<<len<<' '<<K<<endl;
 //    for(int i=0;i<min(K,wordCount[w]);i++)
 //	cout<<(nw[w][i]&0x3ff)<<' '<<(nw[w][i]>>10)<<endl;
-    for(k=0; k<min(len,K); k++)
+    k=0;
+    for(const auto &idx : nw_idx[w])
+    {
+	p[k] = q1[idx]*nwmap[make_pair(idx,w)];
+	qsum += p[k];
+	k++;
+    }
+/*    for(k=0; k<min(len,K); k++)
     {
         if(nw[w][k]==0) break;
         t = nw[w][k]&0x3ff;
@@ -1419,6 +1453,7 @@ int model::sampling_disk(int m, int n) {
 	if(t>=K) 
         	cout<<k<<' '<<p[k]<<' '<<t<<' '<<(nw[w][k]>>10)<<' '<<q1[t]<<' '<<nwsum[t]<<' '<<ND.visit(m,t)<<endl;
     }
+*/
     len = k;    
     // scaled sample because of unnormalized p[]
     double u = ((double)random() / RAND_MAX) * (ssum+rsum+qsum);
@@ -1427,11 +1462,15 @@ int model::sampling_disk(int m, int n) {
     if(u<=qsum) {
         for(k=1; k<len; k++)
             p[k]+=p[k-1];
+	auto idx = nw_idx[w].begin();
         for(ret = 0; ret < len; ret++)
-            if (p[ret] >= u){ 
-		ret = nw[w][ret]&0x3ff;
+            if (p[ret] >= u){
+		ret = *idx; 
+		//ret = nw[w][ret]&0x3ff;
 		break;
-	    }
+	    } 
+	    else
+		idx++;
         if(ret==len)
 	    ret = len-1;
         tcount+=len;
@@ -1452,7 +1491,9 @@ int model::sampling_disk(int m, int n) {
      
     ssum -= alpha * beta / (Vbeta + nwsum[ret-1]);
     rsum -= ND.visit(m, ret-1) * beta / (Vbeta + nwsum[ret-1]);
-    inc(ret-1,w,nw[w]);
+    nwmap[make_pair(ret-1,w)]++;
+    nw_idx[w].insert(ret-1);
+//    inc(ret-1,w,nw[w]);
     ND.visit(m,ret-1) += 1;
     nwsum[ret-1] += 1;
     ndsum[m] += 1;    

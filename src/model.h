@@ -37,7 +37,31 @@
 #include "diskarray.h"
 #include <errno.h>
 #include <vector>
+#include <set>
+#include <unordered_map>
+#include <utility>
 using namespace std;
+
+template <class T>
+inline void hash_combine(std::size_t & seed, const T & v)
+{
+  std::hash<T> hasher;
+  seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+namespace std
+{
+  template<typename S, typename T> struct hash<pair<S, T>>
+  {
+    inline size_t operator()(const pair<S, T> & v) const
+    {
+      size_t seed = 0;
+      ::hash_combine(seed, v.first);
+      ::hash_combine(seed, v.second);
+      return seed;
+    }
+  };
+}
 
 // LDA model
 class model {
@@ -86,6 +110,9 @@ public:
     int * ndsum; // nasum[i]: total number of words in document i, size M
     double ** theta; // theta: document-topic distributions, size M x K
     double ** phi; // phi: topic-word distributions, size K x V
+
+    unordered_map<pair<int,int>,int> nwmap;
+    set<int> *nw_idx;
 
     diskArray ND;//A disk-based nd array;
     diskArray NW;//A disk-based nw array;
