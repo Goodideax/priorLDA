@@ -1093,7 +1093,7 @@ int model::init_est_disk_sample() {
     for (m = 0; m < ptrndata->M; m++) {
         if(((double)random()/RAND_MAX) < sample_rate) {
 	    sdoc.push_back(m);
-	    cout<<m<<' '<<endl;
+	    //cout<<m<<' '<<endl;
 	}
 	else
 	    continue;
@@ -1439,11 +1439,15 @@ int model::sampling_disk(int m, int n) {
     if(u<=qsum) {
         for(k=1; k<len; k++)
             p[k]+=p[k-1];
+//        int tmp=len;
         for(ret = 0; ret < len; ret++)
             if (p[ret] >= u){ 
 		ret = nw[w][ret]&0x3ff;
+//		tmp = nw[w][ret]&0x3ff;
+//		u = ssum+rsum+qsum + 10;
 		break;
 	    }
+//      ret = tmp; 
         if(ret==len)
 	    ret = len-1;
         tcount+=len;
