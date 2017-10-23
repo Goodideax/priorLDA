@@ -1,4 +1,4 @@
-CC=		g++ -std=c++11
+CC=		g++ -std=c++11 -g
 
 OBJS=		strtokenizer.o dataset.o utils.o model.o diskarray.o
 MAIN=		lda

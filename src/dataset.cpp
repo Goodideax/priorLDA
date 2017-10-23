@@ -28,6 +28,7 @@
 #include "dataset.h"
 #include <errno.h>
 #include <string.h>
+#include <fstream>
 
 using namespace std;
 extern int errno;
@@ -57,7 +58,9 @@ document * dataset::doc(int id)
 	   ret = fread(meta,sizeof(long long),2,fmeta);
            docs->load(id,fp,meta);
            current = id;
+
         }
+	if(docs==NULL) cout<<" error !"<<endl;
         return docs;
     }
 
@@ -68,7 +71,7 @@ void document::load(int id,FILE *fp, metafile *meta)
         count = meta->count;
         length = meta->length;
 	this->length = length;
-        //cout<<this->length<<endl;
+	//cout<< id << ' ' <<  length << ' ' << this->length  << endl;
         words = new int[length];
         tags = new int[length];
         ret = fseeko(fp,(count-length*2)*sizeof(int),SEEK_SET);
@@ -106,8 +109,8 @@ void document::flush(int id,FILE *fp, metafile *meta)
         ret = fwrite(tags,sizeof(int),length,fp);
         if(ret!=length)
                 cerr<<"error in flush doc_tags "<<id<<endl;
-        delete words;
-        delete tags;
+        delete[] words;
+        delete[] tags;
         words = NULL;
         tags = NULL;
 }
@@ -122,7 +125,7 @@ int dataset::write_wordmap(string wordmapfile, mapword2id * pword2id) {
     }    
     
     mapword2id::iterator it;
-    fprintf(fout, "%d\n", pword2id->size());
+    fprintf(fout, "%lld\n", pword2id->size());
     for (it = pword2id->begin(); it != pword2id->end(); it++) {
 	fprintf(fout, "%s %d\n", (it->first).c_str(), it->second);
     }
@@ -285,11 +288,11 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
     
     // get the number of documents
     fgets(buff, BUFF_SIZE_LONG - 1, fin);
-//    FILE * ftmp;
-//    ftmp = fopen("lens.tmp","r");
-//    fgets(buff, BUFF_SIZE_LONG - 1, ftmp);
+    //FILE * ftmp;
+    //ftmp = fopen("lens.tmp","r");
+    //fgets(buff, BUFF_SIZE_LONG - 1, ftmp);
     M = atoi(buff);
-//    fclose(ftmp);
+    //fclose(ftmp);
     if (M <= 0) {
 	printf("No document available!\n");
 	return 1;
@@ -314,9 +317,12 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
     // set number of words to zero
     V = 0;
 //add back
+//    map<int,int> tmp_counter;
+    long long wordcnt = 0;
     FILE * fin_file = fopen((dfile+".cmps").c_str(),"wb");
-    FILE * fin_file_meta = fopen((dfile+".meta").c_str(),"w");
+    FILE * fin_file_meta = fopen((dfile+".meta").c_str(),"wb");
     long long count=0, length;
+    metafile * pmeta = new  metafile;
     for (int i = 0; i < M; i++) {
 	if(i%100000==0) cout<<i<<' '<<count<<endl;
 	fgets(buff, BUFF_SIZE_LONG - 1, fin);
@@ -333,21 +339,23 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
 	
 	// allocate new document
 //	document * pdoc = new document(length);
-	metafile * pmeta = new  metafile;
-	
+		
 	int * pdoc = new int[length];	
 	for (int j = 0; j < length; j++) {
+	   wordcnt++;
 	    it = word2id.find(strtok.token(j));
 	    if (it == word2id.end()) {
 		// word not found, i.e., new word
 //		pdoc->words[j] = word2id.size();
 		pdoc[j] = word2id.size();
-        	idCount.insert(pair<int, int>(word2id.size(),1));
+		idCount.push_back(1);
+//        	tmp_counter.insert(pair<int, int>(word2id.size(),1));
 		word2id.insert(pair<string, int>(strtok.token(j), word2id.size()));
 	    } 
             else {
 		pdoc[j] = it->second;
-		idCount[it->second]+=1;
+		idCount[it->second] += 1;
+//		tmp_counter[it->second]+=1;
 //		pdoc->words[j] = it->second;
 	    }
 	}
@@ -364,8 +372,19 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
 	memset(pdoc,0,length*sizeof(int));
 	fwrite(pdoc,sizeof(int),length,fin_file);
 	fwrite(pmeta,sizeof(long long),2,fin_file_meta);
-	delete pdoc;
+	delete[] pdoc;
     }
+//    idCount = new int[tmp_counter.size()];
+  //  for(auto i=tmp_counter.begin();i!=tmp_counter.end();i++)
+//	idCount[i->first] = i->second;
+    long long tmp_count = 0;
+    for(int i=0;i<word2id.size();i++){
+	if(idCount[i] >= 100)
+	   tmp_count += 100;
+	else
+	   tmp_count += idCount[i];
+    }
+    cout<< "Average occurence is :" << tmp_count / (word2id.size() + 0.0) << endl; 	
     if(TEST)
 	printf("Already print all data!\n"); 
     fclose(fin);
@@ -377,6 +396,14 @@ int dataset::read_trndata_to_compress(string dfile, string wordmapfile) {
     }
     cout<<count<<endl;
     // update number of words
+/*    ofstream fout("map.txt");
+    cout<<"Total word is "<<wordcnt<<endl;
+    for(auto iter = word2id.begin(); iter!= word2id.end(); iter++)
+    {
+	fout<<iter->second<<' '<<iter->first<<endl;
+    }
+    fout.close();
+*/
     V = word2id.size();
     if(TEST)
 	printf("I am about to return!\n");

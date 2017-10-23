@@ -38,7 +38,7 @@ typedef map<string, int> mapword2id;
 // map of words/terms [int => string]
 typedef map<int, string> mapid2word;
 // counter of each id
-typedef map<int, int> idCounter;
+//typedef map<int, int> idCounter;
 
 
 class metafile
@@ -145,10 +145,10 @@ public:
     map<int, int> _id2id; // also used only for inference
     int M; // number of documents
     int V; // number of words   
-    string dfile;
+    string dfile="";
     long long pos;
     int length;
-    idCounter idCount;
+    vector<int> idCount;
 
     void set_dfile(string df)
     {
@@ -193,7 +193,7 @@ public:
 //		delete docs[i];
 //	    }
 	}
-	delete docs;
+//	delete docs;
 	
 	if (_docs) {
 	    for (int i = 0; i < M; i++) {

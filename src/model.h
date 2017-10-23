@@ -66,7 +66,7 @@ public:
     mapid2word id2word; // word map [int => string]
    
     double sample_rate = 0.1;
-    vector<int> sdoc; //the id store for the selected document; 
+//    vector<int> sdoc; //the id store for the selected document; 
     // --- model parameters and variables ---    
     int M; // dataset size (i.e., number of docs)
     int V; // vocabulary size
@@ -86,13 +86,16 @@ public:
     int * ndsum; // nasum[i]: total number of words in document i, size M
     double ** theta; // theta: document-topic distributions, size M x K
     double ** phi; // phi: topic-word distributions, size K x V
+    int * nwsize;
 
     diskArray ND;//A disk-based nd array;
     diskArray NW;//A disk-based nw array;
     diskArray NEWND;//A disk-based newnd array;
     diskArray NEWNW;//A disk-based newnw array;
 
-    idCounter wordCount;//counter for each word
+    //vector<int> newCount;
+    vector<int> wordCount;//counter for each word
+    vector<int> realCount;
     double ssum;//record sum s, for speed up sampling
     double rsum;//record sum r, for speed up sampling
     double qsum;//record sum q, for speed up sampling
@@ -109,6 +112,7 @@ public:
     int * newndsum;
     double ** newtheta;
     double ** newphi;
+    vector<int> sdoc;
     // --------------------------------------
     
     model() {
@@ -118,7 +122,7 @@ public:
     ~model();
 
     int find(int, int*);
-    void inc(int, int, int*);
+    void inc(int, int, int**);
     void dec(int, int, int*);   
  
     // set default values for variables
