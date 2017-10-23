@@ -83,8 +83,8 @@ void model::inc(int topic, int word, int *nw)
 			break;
 		}
 	}
-	for(;i>0;i--)
-		if(nw[i]>nw[i-1]) swap(nw[i],nw[i-1]);
+//	for(;i>0;i--)
+//		if(nw[i]>nw[i-1]) swap(nw[i],nw[i-1]);
 }
 
 void model::dec(int topic, int word, int *nw)
@@ -101,9 +101,10 @@ void model::dec(int topic, int word, int *nw)
 			break;
 		}
 	}
-
-	for(;i<min(len,K)-1 && nw[i+1]!=0 ;i++)
-		if(nw[i]<nw[i+1]) swap(nw[i],nw[i+1]);
+	int tmp=i;
+	for(;i<min(len,K)-1 && nw[i+1]!=0 ;i++);
+		swap(nw[i],nw[tmp]);
+//		if(nw[i]<nw[i+1]) swap(nw[i],nw[i+1]);
 
 }
 
@@ -1129,7 +1130,7 @@ int model::init_est_disk_sample() {
 	for( int i=0;i<ptrndata->doc(m)->length;i++)
 	{
 		int w = ptrndata->doc(m)->words[i];
-		int len = wordCount[i];
+		int len = wordCount[w];
 		int j;
 		tmpsum = 0;
 		for(j=0;j<min(len,K);j++)
