@@ -226,7 +226,7 @@ int model::init_est_disk() {
 // First part is the initialization for the related variables
 // and data structures. The second part is the subset sampling.
 // The algorithm will sample a number of rows from the corpus
-// and apply the gibbs sampling algorithm for these 
+// and apply the gibbs sampling algorithm for these
 int model::init_est_disk_sample() {
 	int m = 0, n, w, k;
 	tcount = 0;
@@ -591,6 +591,21 @@ void model::estimate_disk() {
 		dataset::read_wordmap(dir + wordmapfile, &id2word);
 	}
 
+	// This is an adhoc hack, must be modified later using FLAGS.
+	bool compute_perplxity = true;
+	if (compute_perplxity) {
+		if (phi == NULL)
+			phi = theta = new double*[M];
+		for (m = 0; m < M; m++) {
+			theta[m] = new double[K];
+		}
+
+		phi = new double*[K];
+		for (k = 0; k < K; k++) {
+			phi[k] = new double[V];
+
+		}
+	}
 	printf("Sampling %d iterations!\n", niters);
 	q1 = new double[K];
 	int last_iter = liter;
@@ -624,6 +639,11 @@ void model::estimate_disk() {
 
 		}
 		cout << "diff in iteration " << liter << " is " << diff << endl;
+		if (compute_perplxity) {
+			compute_theta_disk();
+			compute_phi_disk();
+			cout << "perplxity for the " << liter << "iteration is: " << perplxity() << endl;
+		}
 		if (savestep > 0) {
 			if (liter % savestep == 0) {
 				// saving the model
@@ -659,15 +679,12 @@ void model::estimate_disk() {
 	long long nd_cnt = 0;
 	for ( int m = 0; m < M; m++) {
 		for (int n = 0; n < K; n++)
-//	for( int n = 0; n< ptrndata->doc(m)->length; n++)
-//		cout<<"m,n,topic: "<<m<<' '<<n<<' '<<ptrndata->doc(m)->tags[n]<<endl;
 			nd_cnt += ND.visit(m, n);
 
 	}
 
 
 	cout << "Total ND count is " << nd_cnt << endl;
-	//cout<<"Total NW Count is "<<nw_cnt<<endl;
 	printf("Gibbs sampling completed!\n");
 	printf("Saving the final model!\n");
 	cout << "tcount is " << tcount << endl;
@@ -705,11 +722,11 @@ int model::sampling_disk(int m, int n) {
 		ssum += alpha * beta / (Vbeta + nwsum[topic - 1]);
 		rsum += ND.visit(m, topic - 1) * beta / (Vbeta + nwsum[topic - 1]);
 		q1[topic - 1] = (alpha + ND.visit(m, topic - 1)) / (Vbeta + nwsum[topic - 1]);
-        //cout<<rsum<<endl;
+		//cout<<rsum<<endl;
 	}
 	qsum = 0;
 	len = wordCount[w];
-    //cout<<len<<' '<<K<<endl;
+	//cout<<len<<' '<<K<<endl;
 //    for(int i=0;i<min(K,wordCount[w]);i++)
 //	cout<<(nw[w][i]&0x3ff)<<' '<<(nw[w][i]>>10)<<endl;
 	for (k = 0; k < min(len, K); k++)
@@ -726,7 +743,7 @@ int model::sampling_disk(int m, int n) {
 	len = k;
 	// scaled sample because of unnormalized p[]
 	double u = ((double)random() / RAND_MAX) * (ssum + rsum + qsum);
-    //cout<<"ssum,rsum,qsum,u: "<<ssum<<' '<<rsum<<' '<<qsum<<' '<<u<<endl;
+	//cout<<"ssum,rsum,qsum,u: "<<ssum<<' '<<rsum<<' '<<qsum<<' '<<u<<endl;
 	if (rsum < 0) cout << "ND " << ND.visit(m, topic - 1) << endl;
 	if (u <= qsum) {
 		for (k = 1; k < len; k++)
@@ -735,8 +752,6 @@ int model::sampling_disk(int m, int n) {
 		for (ret = 0; ret < len; ret++)
 			if (p[ret] >= u) {
 				ret = nw[w][ret] & 0x3ff;
-//		tmp = nw[w][ret]&0x3ff;
-//		u = ssum+rsum+qsum + 10;
 				break;
 			}
 //      ret = tmp;
@@ -785,16 +800,43 @@ void model::compute_theta_disk() {
 }
 
 void model::compute_phi_disk() {
+	int t, count;
 	if (TEST)
 		printf("Enter the compute_phi_disk\n");
 	for (int k = 0; k < K; k++) {
 		for (int w = 0; w < V; w++) {
-			phi[k][w] = (nw[w][k] + beta) / (nwsum[k] + V * beta);
+			phi[k][w] = (beta) / (nwsum[k] + V * beta);
 		}
+	}
+	for (int w = 0; w < V; w++) {
+		int len = wordCount[w];
+		for (k = 0; k < min(len, K); k++) {
+			if (nw[w][k] == 0) break;
+			t = nw[w][k] & 0x3ff;
+			count = nw[w][k] >> 10;
+			phi[t][w] = (count + beta) / (nwsum[t] + V * beta);
+		}
+
 	}
 }
 
-
+double model::perplxity()
+{
+	double log_likelihood=0;
+	double inner_product=0;
+	int tokenCount=0;
+	for (int m = 0; m < M; m++) {
+		for (int n = 0; n < ptrndata->doc(m)->length; n++) {
+			inner_product=0;
+			for ( int k = 0; k < K; k++) {
+				inner_product += theta[m][k]*phi[k][w];
+				}
+			log_likelihood -= log(inner_product);
+		}
+		tokenCount+=ptrndata->doc(m)->length;
+	}
+	return exp(log_likelihood/tokenCount);
+}
 
 int model::init_inf_disk() {
 	// estimating the model from a previously estimated one
